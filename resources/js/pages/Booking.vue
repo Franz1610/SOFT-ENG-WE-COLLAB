@@ -27,7 +27,13 @@
         <section class="flex-1 min-w-[260px] max-w-xs w-full flex flex-col items-start">
           <h1 class="text-4xl font-bold mb-2 text-neutral-900">BOOKING</h1>
           <p class="mb-8 text-neutral-600">Wanna reserve for today or tommorow?</p>
-          <Button variant="default" class="mb-8 w-full md:w-auto bg-[#495846] hover:bg-[#38613a] text-white border-none">Booking History/modify</Button>
+          <Button 
+            variant="default" 
+            class="mb-8 w-full md:w-auto bg-[#495846] hover:bg-[#38613a] text-white border-none"
+            @click="goToBookingHistory"
+          >
+            Booking History/modify
+          </Button>
         </section>
 
         <!-- Right: Booking Form -->
@@ -64,28 +70,30 @@
                 <Input id="pax" v-model="form.pax" type="number" min="1" required />
               </div>
             </div>
-            <div>
-              <Label for="category">Category</Label>
-              <select id="category" v-model="form.category" class="w-full border rounded-md px-3 py-2 mt-1" required>
-                <option value="" disabled selected>Select an option</option>
-                <option value="individual">Individual</option>
-                <option value="master">Master</option>
-                <option value="common">Common</option>
-              </select>
-            </div>
             <Button type="submit" class="w-full mt-4 bg-[#495846] hover:bg-[#38613a] text-white border-none">Submit</Button>
           </form>
         </section>
       </div>
 
       <!-- Select a Room Section -->
-      <div class="w-full max-w-6xl mt-16">
+      <div class="w-full max-w-6xl mt-16" id="room-selection">
         <h2 class="text-xl font-semibold mb-6 text-neutral-900">SELECT A ROOM</h2>
+        
+        <!-- Room Selection Alert -->
+        <div 
+          v-if="showRoomAlert"
+          class="flex items-center gap-2 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700"
+        >
+          <span class="text-orange-500 font-bold">!</span>
+          <span>Please select a room.</span>
+        </div>
+        
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div v-for="room in rooms" :key="room.id" @click="selectRoom(room.id)"
             :class="['cursor-pointer transition-all border-2 rounded-xl p-4 flex flex-col items-center',
               selectedRoom === room.id ? 'border-green-700 bg-green-50' : 'border-neutral-200 bg-white',
-              'hover:border-green-600']">
+              'hover:border-green-600',
+              roomsBlinking ? 'animate-pulse' : '']">
             <img :src="room.image" :alt="room.name" class="w-48 h-36 object-cover rounded-lg mb-3" />
             <div class="text-lg font-bold text-neutral-900">{{ room.name }}</div>
             <div class="text-sm font-medium text-neutral-600">{{ room.availability }}</div>
@@ -150,6 +158,8 @@ const user = computed(() => page.props.auth.user);
 
 // Modal state
 const showLogoutModal = ref(false);
+const showRoomAlert = ref(false);
+const roomsBlinking = ref(false);
 
 const form = ref({
   firstName: '',
@@ -158,7 +168,6 @@ const form = ref({
   email: '',
   additional: '',
   pax: '',
-  category: '',
 });
 
 const rooms = ref([
@@ -168,6 +177,7 @@ const rooms = ref([
     image: '/images/booking/indiv_room.png',
     availability: 'FULL', // Placeholder, will be dynamic
     capacity: '1 PAX ONLY',
+    category: 'individual'
   },
   {
     id: 2,
@@ -175,6 +185,7 @@ const rooms = ref([
     image: '/images/booking/master_room.png',
     availability: '3 ROOMS VACANT', // Placeholder, will be dynamic
     capacity: '5-10 PAX ONLY',
+    category: 'master'
   },
   {
     id: 3,
@@ -182,23 +193,79 @@ const rooms = ref([
     image: '/images/booking/common_room.png',
     availability: '1 ROOM VACANT', // Placeholder, will be dynamic
     capacity: '3-5 PAX ONLY',
+    category: 'common'
   },
 ]);
 
 const selectedRoom = ref<number|null>(null);
 function selectRoom(id: number) {
   selectedRoom.value = id;
+  // Hide room alert when a room is selected
+  showRoomAlert.value = false;
+  roomsBlinking.value = false;
 }
 
 
 function submitBooking() {
-  // You can send the form data to the backend here if needed
-  // Redirect to the schedule selection page using Inertia
-  router.visit('/booking/schedule');
+  // Validate form data first
+  if (!form.value.firstName || !form.value.lastName || !form.value.contact || 
+      !form.value.email || !form.value.pax) {
+    alert('Please fill in all required fields');
+    return;
+  }
+
+  // Check if room is selected
+  if (!selectedRoom.value) {
+    // Scroll to room selection section
+    const roomSection = document.getElementById('room-selection');
+    if (roomSection) {
+      roomSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+
+    // Show alert and start blinking animation
+    showRoomAlert.value = true;
+    roomsBlinking.value = true;
+
+    // Stop blinking after 2 slow blinks (4 seconds total)
+    setTimeout(() => {
+      roomsBlinking.value = false;
+    }, 4000);
+
+    // Hide alert after 5 seconds
+    setTimeout(() => {
+      showRoomAlert.value = false;
+    }, 5000);
+
+    return;
+  }
+
+  // Get the category from the selected room
+  const selectedRoomData = rooms.value.find(room => room.id === selectedRoom.value);
+  const category = selectedRoomData?.category || 'individual';
+
+  // Store booking data in session storage for the next page
+  const bookingData = {
+    ...form.value,
+    category: category,
+    room_id: selectedRoom.value
+  };
+  
+  // Pass data to schedule page using Inertia
+  router.visit('/booking/schedule', {
+    method: 'post',
+    data: bookingData
+  });
 }
 
 function goHome() {
   window.location.href = '/';
+}
+
+function goToBookingHistory() {
+  router.visit('/booking/history');
 }
 
 function closeLogoutModal() {
@@ -305,6 +372,22 @@ main.main-content {
 .logout-btn:hover {
   background-color: #b91c1c !important;
   border-color: #b91c1c !important;
+}
+
+/* Custom slow pulse animation for room selection */
+@keyframes slow-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+}
+
+.animate-pulse {
+  animation: slow-pulse 2s ease-in-out infinite;
 }
 
 /* Responsive and minimal tweaks */

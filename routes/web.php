@@ -28,6 +28,28 @@ Route::get('/booking/schedule', function () {
     return Inertia::render('BookingSchedule');
 })->middleware(['auth', 'verified']);
 
+Route::post('/booking/schedule', function (\Illuminate\Http\Request $request) {
+    // Store booking form data in session
+    $bookingData = $request->all();
+    $request->session()->put('booking_data', $bookingData);
+    return Inertia::render('BookingSchedule', $bookingData);
+})->middleware(['auth', 'verified']);
+
+Route::get('/booking/history', function () {
+    $bookingController = new \App\Http\Controllers\BookingController();
+    $bookings = $bookingController->getUserBookings();
+    
+    return Inertia::render('BookingHistory', [
+        'bookings' => $bookings
+    ]);
+})->middleware(['auth', 'verified']);
+
+Route::post('/booking/store', [\App\Http\Controllers\BookingController::class, 'store'])
+    ->middleware(['auth', 'verified']);
+
+Route::post('/booking/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'cancel'])
+    ->middleware(['auth', 'verified']);
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('admin')->group(function () {
         Route::get('/admin/users', [\App\Http\Controllers\UserController::class, 'index']);

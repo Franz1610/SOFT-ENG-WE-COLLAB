@@ -157,11 +157,11 @@
         <DialogFooter class="flex gap-3 sm:justify-center">
           <Button 
             variant="outline" 
-            @click="closeModal"
+            @click="viewMyBookings"
             class="flex-1"
             style="border-color: #495846; color: #495846;"
           >
-            Stay on Page
+            View My Booking
           </Button>
           <Button 
             @click="confirmBooking"
@@ -283,15 +283,71 @@ function submitSchedule() {
 }
 
 function confirmBooking() {
-  // Here you would typically send the booking data to the backend
-  showConfirmationModal.value = false;
+  // Get booking data from props (passed from session)
+  const bookingData = page.props as any;
   
-  // Redirect to a confirmation page or back to home
-  router.visit('/');
+  // Prepare booking data
+  const submitData = {
+    first_name: bookingData.firstName || '',
+    last_name: bookingData.lastName || '',
+    contact: bookingData.contact || '',
+    email: bookingData.email || '',
+    additional_info: bookingData.additional || '',
+    pax: bookingData.pax || 1,
+    category: bookingData.category || 'individual',
+    room_id: bookingData.room_id || 1,
+    booking_date: form.value.date,
+    start_time: formatTimeDisplay(form.value.startTime),
+    end_time: formatTimeDisplay(form.value.endTime),
+  };
+
+  // Send booking data to backend
+  router.post('/booking/store', submitData, {
+    onSuccess: () => {
+      showConfirmationModal.value = false;
+      router.visit('/');
+    },
+    onError: (errors) => {
+      console.error('Booking error:', errors);
+      alert('There was an error creating your booking. Please try again.');
+    }
+  });
 }
 
 function closeModal() {
   showConfirmationModal.value = false;
+}
+
+function viewMyBookings() {
+  // Get booking data from props (passed from session)
+  const bookingData = page.props as any;
+  
+  // Prepare booking data
+  const submitData = {
+    first_name: bookingData.firstName || '',
+    last_name: bookingData.lastName || '',
+    contact: bookingData.contact || '',
+    email: bookingData.email || '',
+    additional_info: bookingData.additional || '',
+    pax: bookingData.pax || 1,
+    category: bookingData.category || 'individual',
+    room_id: bookingData.room_id || 1,
+    booking_date: form.value.date,
+    start_time: formatTimeDisplay(form.value.startTime),
+    end_time: formatTimeDisplay(form.value.endTime),
+  };
+
+  // Send booking data to backend
+  router.post('/booking/store', submitData, {
+    onSuccess: () => {
+      showConfirmationModal.value = false;
+      router.visit('/booking/history');
+    },
+    onError: (errors) => {
+      console.error('Booking error:', errors);
+      alert('There was an error creating your booking. Please try again.');
+    }
+  });
 }
 
 function closeLogoutModal() {
