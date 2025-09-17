@@ -1,8 +1,25 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem } from '@/types';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, usePage, router } from '@inertiajs/vue3';
 import UserCrud from '@/components/UserCrud.vue';
+import { computed, ref } from 'vue';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+
+// Get authentication data from Inertia
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+
+// Modal state
+const showLogoutModal = ref(false);
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -12,6 +29,27 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const users = usePage().props.users as any[];
+
+function closeLogoutModal() {
+  showLogoutModal.value = false;
+}
+
+function confirmLogout() {
+  showLogoutModal.value = false;
+  router.post('/logout');
+}
+
+function handleLogout() {
+  showLogoutModal.value = true;
+}
+
+function handleAuthAction() {
+  if (user.value) {
+    handleLogout();
+  } else {
+    router.visit('/login');
+  }
+}
 </script>
 
 <template>
@@ -20,7 +58,13 @@ const users = usePage().props.users as any[];
       <div class="header-inner">
         <div class="logo">WECOLLAB</div>
         <nav class="nav">
-          <a href="login" class="nav-link">Log in</a>
+          <a 
+            href="#" 
+            @click.prevent="handleAuthAction"
+            :class="['nav-link', { 'logout-link': user }]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
           <a href="#" class="nav-link">Deals & Promo</a>
           <a href="#" class="nav-link">What's NEW?</a>
           <a href="#" class="nav-link">Booking</a>
@@ -50,6 +94,37 @@ const users = usePage().props.users as any[];
           </div>
       </AppLayout>
     </main>
+
+    <!-- Logout Confirmation Modal -->
+    <Dialog :open="showLogoutModal" @update:open="closeLogoutModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Confirm Logout
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            Are you sure you want to log out?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeLogoutModal"
+            class="flex-1"
+            style="border-color: #495846; color: #495846;"
+          >
+            Cancel
+          </Button>
+          <Button 
+            @click="confirmLogout"
+            class="flex-1 text-white border-none logout-btn"
+          >
+            Logout
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -143,6 +218,19 @@ const users = usePage().props.users as any[];
 .nav-link {
     color: #FFFAE9;
     text-decoration: none;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.nav-link:hover {
+    background: #fff;
+    color: #495846;
+}
+
+.logout-link:hover {
+    background: #dc2626 !important;
+    color: #fff !important;
 }
 
 .home-btn {
@@ -152,5 +240,14 @@ const users = usePage().props.users as any[];
     padding: 0.5rem 1rem;
     border-radius: 0.375rem;
     cursor: pointer;
+}
+
+.logout-btn {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.logout-btn:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
 }
 </style>

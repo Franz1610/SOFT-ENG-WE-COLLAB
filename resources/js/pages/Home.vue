@@ -4,7 +4,13 @@
       <div class="header-inner">
         <div class="logo">WECOLLAB</div>
         <nav class="nav">
-          <a href="login" class="nav-link">Log in</a>
+          <a 
+            href="#" 
+            @click.prevent="handleAuthAction"
+            :class="['nav-link', { 'logout-link': user }]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
           <a href="#" class="nav-link">Deals & Promo</a>
           <a href="#" class="nav-link">What's NEW?</a>
             <Link href="/booking" class="nav-link">Booking</Link>
@@ -122,6 +128,37 @@
       </section>
       <!-- End Reviews Section -->
     </main>
+
+    <!-- Logout Confirmation Modal -->
+    <Dialog :open="showLogoutModal" @update:open="closeLogoutModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Confirm Logout
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            Are you sure you want to log out?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeLogoutModal"
+            class="flex-1"
+            style="border-color: #495846; color: #495846;"
+          >
+            Cancel
+          </Button>
+          <Button 
+            @click="confirmLogout"
+            class="flex-1 text-white border-none logout-btn"
+          >
+            Logout
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -193,6 +230,14 @@ html, body, #app, .main-content {
 .nav-link:hover {
   background: #fff;
   color: #495846;
+}
+.logout-link:hover {
+  background: #dc2626 !important;
+  color: #fff !important;
+}
+.logout-link:hover {
+  background: #dc2626 !important;
+  color: #fff !important;
 }
 .home-btn {
   background: #fff;
@@ -475,10 +520,57 @@ section > .testimonial-slide {
   0% { transform: translateX(-60px); }
   100% { transform: translateX(0); }
 }
+
+.logout-btn {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.logout-btn:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+}
 </style>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { Link, router, usePage } from '@inertiajs/vue3'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+
+// Get authentication data from Inertia
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+
+// Modal state
+const showLogoutModal = ref(false);
+
+function closeLogoutModal() {
+  showLogoutModal.value = false;
+}
+
+function confirmLogout() {
+  showLogoutModal.value = false;
+  router.post('/logout');
+}
+
+function handleLogout() {
+  showLogoutModal.value = true;
+}
+
+function handleAuthAction() {
+  if (user.value) {
+    handleLogout();
+  } else {
+    router.visit('/login');
+  }
+}
 
 const reviews = [
   {
@@ -594,5 +686,4 @@ function getCardStyle(idx: number) {
     pointerEvents: 'none'
   }
 }
-import { Link } from '@inertiajs/vue3';
 </script>

@@ -5,7 +5,13 @@
       <div class="header-inner">
         <div class="logo">WECOLLAB</div>
         <nav class="nav">
-          <Link href="/login" class="nav-link">Log in</Link>
+          <a 
+            href="#" 
+            @click.prevent="handleAuthAction"
+            :class="['nav-link', { 'logout-link': user }]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
           <a href="#" class="nav-link">Deals & Promo</a>
           <a href="#" class="nav-link">What's NEW?</a>
           <a href="#" class="nav-link">Booking</a>
@@ -88,6 +94,37 @@
         </div>
       </div>
     </main>
+
+    <!-- Logout Confirmation Modal -->
+    <Dialog :open="showLogoutModal" @update:open="closeLogoutModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Confirm Logout
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            Are you sure you want to log out?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeLogoutModal"
+            class="flex-1"
+            style="border-color: #495846; color: #495846;"
+          >
+            Cancel
+          </Button>
+          <Button 
+            @click="confirmLogout"
+            class="flex-1 text-white border-none logout-btn"
+          >
+            Logout
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -96,8 +133,23 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ref } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { ref, computed } from 'vue';
+import { router, Link, usePage } from '@inertiajs/vue3';
+
+// Get authentication data from Inertia
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+
+// Modal state
+const showLogoutModal = ref(false);
 
 const form = ref({
   firstName: '',
@@ -148,6 +200,27 @@ function submitBooking() {
 function goHome() {
   window.location.href = '/';
 }
+
+function closeLogoutModal() {
+  showLogoutModal.value = false;
+}
+
+function confirmLogout() {
+  showLogoutModal.value = false;
+  router.post('/logout');
+}
+
+function handleLogout() {
+  showLogoutModal.value = true;
+}
+
+function handleAuthAction() {
+  if (user.value) {
+    handleLogout();
+  } else {
+    router.visit('/login');
+  }
+}
 </script>
 
 <style scoped>
@@ -195,6 +268,10 @@ function goHome() {
   background: #fff;
   color: #495846;
 }
+.logout-link:hover {
+  background: #dc2626 !important;
+  color: #fff !important;
+}
 .home-btn {
   background: #fff;
   color: #495846;
@@ -219,6 +296,15 @@ main.main-content {
   max-width: 100vw;
   overflow-x: hidden;
   margin-top: 54px;
+}
+
+.logout-btn {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.logout-btn:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
 }
 
 /* Responsive and minimal tweaks */

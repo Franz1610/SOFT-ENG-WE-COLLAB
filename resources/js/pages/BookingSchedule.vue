@@ -5,7 +5,13 @@
       <div class="header-inner">
         <div class="logo" @click="goHome">WECOLLAB</div>
         <nav class="nav">
-          <a href="/login" class="nav-link">Log in</a>
+          <a 
+            href="#" 
+            @click.prevent="handleAuthAction"
+            :class="['nav-link', { 'logout-link': user }]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
           <a href="#" class="nav-link">Deals & Promo</a>
           <a href="#" class="nav-link">What's NEW?</a>
           <a href="/booking" class="nav-link">Booking</a>
@@ -33,15 +39,70 @@
             />
           </div>
           
+          <!-- Start Time -->
           <div>
-            <Label for="time">Time</Label>
-            <Input 
-              id="time" 
-              v-model="form.time" 
-              type="time" 
-              required 
-              class="mt-1"
-            />
+            <Label>Start Time</Label>
+            <div class="mt-1 flex gap-2 items-center">
+              <div class="flex items-center bg-gray-50 rounded-md p-1">
+                <input 
+                  v-model="form.startTime.hour"
+                  type="number" 
+                  min="01" 
+                  max="12" 
+                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                  @input="formatTimeInput($event, 'startTime', 'hour')"
+                />
+                <span class="mx-1 text-lg">:</span>
+                <input 
+                  v-model="form.startTime.minute"
+                  type="number" 
+                  min="00" 
+                  max="59" 
+                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                  @input="formatTimeInput($event, 'startTime', 'minute')"
+                />
+              </div>
+              <select 
+                v-model="form.startTime.period"
+                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- End Time -->
+          <div>
+            <Label>End Time</Label>
+            <div class="mt-1 flex gap-2 items-center">
+              <div class="flex items-center bg-gray-50 rounded-md p-1">
+                <input 
+                  v-model="form.endTime.hour"
+                  type="number" 
+                  min="01" 
+                  max="12" 
+                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                  @input="formatTimeInput($event, 'endTime', 'hour')"
+                />
+                <span class="mx-1 text-lg">:</span>
+                <input 
+                  v-model="form.endTime.minute"
+                  type="number" 
+                  min="00" 
+                  max="59" 
+                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                  @input="formatTimeInput($event, 'endTime', 'minute')"
+                />
+              </div>
+              <select 
+                v-model="form.endTime.period"
+                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
           </div>
           
           <div class="flex gap-3">
@@ -63,20 +124,124 @@
         </form>
       </div>
     </main>
+
+    <!-- Confirmation Modal -->
+    <Dialog :open="showConfirmationModal" @update:open="closeModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            🎉 Booking Confirmed!
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            Your booking has been successfully scheduled.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div class="py-6 px-4 rounded-lg border mx-6" style="background: #FFFAE9; border-color: #495846;">
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Date:</span>
+              <span class="font-semibold" style="color: #495846;">{{ form.date }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Start Time:</span>
+              <span class="font-semibold" style="color: #495846;">{{ formatTimeDisplay(form.startTime) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">End Time:</span>
+              <span class="font-semibold" style="color: #495846;">{{ formatTimeDisplay(form.endTime) }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeModal"
+            class="flex-1"
+            style="border-color: #495846; color: #495846;"
+          >
+            Stay on Page
+          </Button>
+          <Button 
+            @click="confirmBooking"
+            class="flex-1 text-white border-none modal-confirm-btn"
+          >
+            Go to Home
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Logout Confirmation Modal -->
+    <Dialog :open="showLogoutModal" @update:open="closeLogoutModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Confirm Logout
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            Are you sure you want to log out?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeLogoutModal"
+            class="flex-1"
+            style="border-color: #495846; color: #495846;"
+          >
+            Cancel
+          </Button>
+          <Button 
+            @click="confirmLogout"
+            class="flex-1 text-white border-none logout-btn"
+          >
+            Logout
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+// Get authentication data from Inertia
+const page = usePage();
+const user = computed(() => page.props.auth.user);
 
 const form = ref({
   date: '',
-  time: '',
+  startTime: {
+    hour: '00',
+    minute: '00',
+    period: 'AM'
+  },
+  endTime: {
+    hour: '00',
+    minute: '00',
+    period: 'AM'
+  }
 });
+
+// Modal state
+const showConfirmationModal = ref(false);
+const showLogoutModal = ref(false);
 
 // Set minimum date to today
 const minDate = computed(() => {
@@ -84,18 +249,58 @@ const minDate = computed(() => {
   return today.toISOString().split('T')[0];
 });
 
+// Format time input to ensure 2 digits
+function formatTimeInput(event: Event, timeType: 'startTime' | 'endTime', field: 'hour' | 'minute') {
+  const target = event.target as HTMLInputElement;
+  const value = parseInt(target.value);
+  
+  if (field === 'hour') {
+    if (value < 1) target.value = '01';
+    else if (value > 12) target.value = '12';
+    else target.value = value.toString().padStart(2, '0');
+    form.value[timeType].hour = target.value;
+  } else if (field === 'minute') {
+    if (value < 0) target.value = '00';
+    else if (value > 59) target.value = '59';
+    else target.value = value.toString().padStart(2, '0');
+    form.value[timeType].minute = target.value;
+  }
+}
+
+// Format time for display
+function formatTimeDisplay(timeObj: { hour: string; minute: string; period: string }) {
+  return `${timeObj.hour}:${timeObj.minute} ${timeObj.period}`;
+}
+
 function submitSchedule() {
-  if (!form.value.date || !form.value.time) {
-    alert('Please select both date and time');
+  if (!form.value.date || !form.value.startTime.hour || !form.value.endTime.hour) {
+    alert('Please select date, start time, and end time');
     return;
   }
   
+  // Show confirmation modal instead of alert
+  showConfirmationModal.value = true;
+}
+
+function confirmBooking() {
   // Here you would typically send the booking data to the backend
-  // For now, we'll just show a success message and redirect
-  alert(`Booking confirmed for ${form.value.date} at ${form.value.time}`);
+  showConfirmationModal.value = false;
   
   // Redirect to a confirmation page or back to home
   router.visit('/');
+}
+
+function closeModal() {
+  showConfirmationModal.value = false;
+}
+
+function closeLogoutModal() {
+  showLogoutModal.value = false;
+}
+
+function confirmLogout() {
+  showLogoutModal.value = false;
+  router.post('/logout');
 }
 
 function goBack() {
@@ -104,6 +309,18 @@ function goBack() {
 
 function goHome() {
   router.visit('/');
+}
+
+function handleLogout() {
+  showLogoutModal.value = true;
+}
+
+function handleAuthAction() {
+  if (user.value) {
+    handleLogout();
+  } else {
+    router.visit('/login');
+  }
 }
 </script>
 
@@ -153,6 +370,10 @@ function goHome() {
   background: #fff;
   color: #495846;
 }
+.logout-link:hover {
+  background: #dc2626 !important;
+  color: #fff !important;
+}
 .home-btn {
   background: #fff;
   color: #495846;
@@ -177,5 +398,24 @@ main.main-content {
   max-width: 100vw;
   overflow-x: hidden;
   margin-top: 54px;
+}
+
+/* Modal button overrides */
+.modal-confirm-btn {
+  background-color: #495846 !important;
+  border-color: #495846 !important;
+}
+.modal-confirm-btn:hover {
+  background-color: #38613a !important;
+  border-color: #38613a !important;
+}
+
+.logout-btn {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.logout-btn:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
 }
 </style>
