@@ -180,20 +180,20 @@ const rooms = ref([
     category: 'individual'
   },
   {
-    id: 2,
-    name: 'MASTER ROOM',
-    image: '/images/booking/master_room.png',
-    availability: '3 ROOMS VACANT', // Placeholder, will be dynamic
-    capacity: '5-10 PAX ONLY',
-    category: 'master'
-  },
-  {
     id: 3,
     name: 'COMMON ROOM',
     image: '/images/booking/common_room.png',
     availability: '1 ROOM VACANT', // Placeholder, will be dynamic
     capacity: '3-5 PAX ONLY',
     category: 'common'
+  },
+  {
+    id: 2,
+    name: 'MASTER ROOM',
+    image: '/images/booking/master_room.png',
+    availability: '3 ROOMS VACANT', // Placeholder, will be dynamic
+    capacity: '5-10 PAX ONLY',
+    category: 'master'
   },
 ]);
 

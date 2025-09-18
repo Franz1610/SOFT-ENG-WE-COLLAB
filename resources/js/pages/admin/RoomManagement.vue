@@ -92,7 +92,7 @@ const getAmenityIcon = (amenity: string) => {
                 <div class="grid auto-rows-min gap-4 md:grid-cols-4">
                     <Card class="stats-card">
                         <CardHeader class="pb-2">
-                            <CardTitle class="text-sm font-medium text-[#FFFAE9]">Total Rooms</CardTitle>
+                            <CardTitle class="text-sm font-medium" style="color: #FFFAE9 !important;">Total Rooms</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div class="text-2xl font-bold text-[#FFFAE9]">12</div>
@@ -102,30 +102,30 @@ const getAmenityIcon = (amenity: string) => {
                     
                     <Card class="stats-card">
                         <CardHeader class="pb-2">
-                            <CardTitle class="text-sm font-medium text-[#FFFAE9]">Available</CardTitle>
+                            <CardTitle class="text-sm font-medium" style="color: #FFFAE9 !important;">Available</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-green-200">8</div>
+                            <div class="text-2xl font-bold" style="color: #86efac !important;">8</div>
                             <p class="text-xs text-[#FFFAE9]/80">Ready to book</p>
                         </CardContent>
                     </Card>
                     
                     <Card class="stats-card">
                         <CardHeader class="pb-2">
-                            <CardTitle class="text-sm font-medium text-[#FFFAE9]">Occupied</CardTitle>
+                            <CardTitle class="text-sm font-medium" style="color: #FFFAE9 !important;">Occupied</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-red-200">3</div>
+                            <div class="text-2xl font-bold" style="color: #fca5a5 !important;">3</div>
                             <p class="text-xs text-[#FFFAE9]/80">Currently in use</p>
                         </CardContent>
                     </Card>
                     
                     <Card class="stats-card">
                         <CardHeader class="pb-2">
-                            <CardTitle class="text-sm font-medium text-[#FFFAE9]">Maintenance</CardTitle>
+                            <CardTitle class="text-sm font-medium" style="color: #FFFAE9 !important;">Maintenance</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-yellow-200">1</div>
+                            <div class="text-2xl font-bold" style="color: #fde68a !important;">1</div>
                             <p class="text-xs text-[#FFFAE9]/80">Under maintenance</p>
                         </CardContent>
                     </Card>
@@ -256,6 +256,21 @@ const getAmenityIcon = (amenity: string) => {
 
 :deep(.card-title) {
     color: #4b824b !important;
+}
+
+/* Stats cards should have cream text since they have green backgrounds */
+:deep(.stats-card .card-title) {
+    color: #FFFAE9 !important;
+}
+
+/* More specific override for stats card titles */
+:deep(.stats-card) :deep(.card-title) {
+    color: #FFFAE9 !important;
+}
+
+/* Override the broad rule - only apply cream color to titles, not numbers */
+.stats-card :deep(.card-title) {
+    color: #FFFAE9 !important;
 }
 
 :deep(.card-description) {
