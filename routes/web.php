@@ -14,7 +14,7 @@ Route::get('dashboard', function () {
         return redirect('/login');
     }
     $users = \App\Models\User::all();
-    return Inertia::render('Dashboard', [
+    return Inertia::render('admin/Dashboard', [
         'users' => $users,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -56,6 +56,45 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/users/{id}/edit', [\App\Http\Controllers\UserController::class, 'edit']);
         Route::put('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'update']);
         Route::delete('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy']);
+        
+        Route::get('/admin/bookings', function () {
+            $bookings = \App\Models\Booking::with('user')
+                ->orderBy('booking_date', 'desc')
+                ->orderBy('start_time', 'desc')
+                ->get()
+                ->map(function ($booking) {
+                return [
+                    'id' => $booking->id,
+                    'user' => [
+                        'id' => $booking->user->id,
+                        'name' => $booking->user->name,
+                        'email' => $booking->user->email,
+                    ],
+                    'company_name' => $booking->company_name,
+                    'room' => $booking->room_id,
+                    'room_name' => $booking->room_name,
+                    'booking_date' => $booking->booking_date->format('Y-m-d'),
+                    'start_time' => $booking->start_time,
+                    'end_time' => $booking->end_time,
+                    'formatted_time' => $booking->formatted_time,
+                    'status' => $booking->status,
+                    'created_at' => $booking->created_at->format('Y-m-d H:i:s'),
+                ];
+            });
+            
+            return Inertia::render('admin/ManageBookings', [
+                'bookings' => $bookings,
+            ]);
+        });
+        
+        Route::get('/admin/rooms', function () {
+            return Inertia::render('admin/RoomManagement');
+        });
+        
+        // Admin booking management routes
+        Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);
+        Route::post('/admin/bookings/{id}/reject', [\App\Http\Controllers\BookingController::class, 'reject']);
+        Route::post('/admin/bookings/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'adminCancel']);
     });
 });
 

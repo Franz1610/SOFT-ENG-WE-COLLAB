@@ -42,10 +42,10 @@ class BookingController extends Controller
             'booking_date' => $validated['booking_date'],
             'start_time' => $startTime,
             'end_time' => $endTime,
-            'status' => 'confirmed', // Mark as confirmed when created
+            'status' => 'pending', // Mark as pending when created - requires admin approval
         ]);
 
-        return redirect()->back()->with('success', 'Booking created successfully!');
+        return redirect()->back()->with('success', 'Booking submitted successfully! Please wait for admin approval.');
     }
 
     public function getUserBookings()
@@ -61,7 +61,7 @@ class BookingController extends Controller
                     'category' => ucfirst($booking->category) . ' room',
                     'time' => $booking->formatted_time,
                     'status' => $this->mapStatus($booking->status),
-                    'can_cancel' => $booking->status === 'confirmed' && $booking->booking_date >= now()->toDateString(),
+                    'can_cancel' => in_array($booking->status, ['confirmed', 'pending']) && $booking->booking_date >= now()->toDateString(),
                 ];
             });
 
@@ -72,7 +72,7 @@ class BookingController extends Controller
     {
         $booking = Booking::where('id', $id)
             ->where('user_id', auth()->id())
-            ->where('status', 'confirmed')
+            ->whereIn('status', ['confirmed', 'pending'])
             ->where('booking_date', '>=', now()->toDateString())
             ->first();
 
@@ -83,6 +83,52 @@ class BookingController extends Controller
         $booking->update(['status' => 'cancelled']);
 
         return back()->with('success', 'Booking cancelled successfully');
+    }
+
+    // Admin methods for booking approval
+    public function approve($id)
+    {
+        $booking = Booking::where('id', $id)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$booking) {
+            return redirect('/admin/bookings')->with('error', 'Booking not found or already processed');
+        }
+
+        $booking->update(['status' => 'confirmed']);
+
+        return redirect('/admin/bookings')->with('success', 'Booking approved successfully');
+    }
+
+    public function reject($id)
+    {
+        $booking = Booking::where('id', $id)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$booking) {
+            return redirect('/admin/bookings')->with('error', 'Booking not found or already processed');
+        }
+
+        $booking->update(['status' => 'rejected']);
+
+        return redirect('/admin/bookings')->with('success', 'Booking rejected successfully');
+    }
+
+    public function adminCancel($id)
+    {
+        $booking = Booking::where('id', $id)
+            ->whereIn('status', ['confirmed', 'pending'])
+            ->first();
+
+        if (!$booking) {
+            return redirect('/admin/bookings')->with('error', 'Booking not found or cannot be cancelled');
+        }
+
+        $booking->update(['status' => 'cancelled']);
+
+        return redirect('/admin/bookings')->with('success', 'Booking cancelled successfully');
     }
 
     private function convertTimeFormat($timeString)
@@ -107,6 +153,7 @@ class BookingController extends Controller
             'pending' => 'Pending',
             'confirmed' => 'Done',
             'cancelled' => 'Cancelled',
+            'rejected' => 'Rejected',
             'completed' => 'Done',
         ];
 

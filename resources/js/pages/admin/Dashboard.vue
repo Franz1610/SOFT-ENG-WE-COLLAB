@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
 import { Head, usePage, router } from '@inertiajs/vue3';
 import UserCrud from '@/components/UserCrud.vue';
 import { computed, ref } from 'vue';
@@ -16,17 +15,9 @@ import { Button } from '@/components/ui/button';
 
 // Get authentication data from Inertia
 const page = usePage();
-const user = computed(() => page.props.auth.user);
 
 // Modal state
 const showLogoutModal = ref(false);
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
-];
 
 const users = usePage().props.users as any[];
 
@@ -38,44 +29,13 @@ function confirmLogout() {
   showLogoutModal.value = false;
   router.post('/logout');
 }
-
-function handleLogout() {
-  showLogoutModal.value = true;
-}
-
-function handleAuthAction() {
-  if (user.value) {
-    handleLogout();
-  } else {
-    router.visit('/login');
-  }
-}
 </script>
 
 <template>
   <div style="background: #232323; min-height: 100vh;">
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo">WECOLLAB</div>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="#" class="nav-link">What's NEW?</a>
-          <a href="#" class="nav-link">Booking</a>
-          <button class="home-btn">HOME</button>
-        </nav>
-      </div>
-    </header>
-    <main class="main-content">
-      <Head title="Dashboard" />
+    <Head title="Dashboard" />
 
-      <AppLayout :breadcrumbs="breadcrumbs">
+    <AppLayout>
           <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
               <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                   <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
@@ -93,7 +53,6 @@ function handleAuthAction() {
               </div>
           </div>
       </AppLayout>
-    </main>
 
     <!-- Logout Confirmation Modal -->
     <Dialog :open="showLogoutModal" @update:open="closeLogoutModal">
@@ -186,60 +145,6 @@ function handleAuthAction() {
     background-color: #4b824b !important;
     color: #FFFAE9 !important;
     border-color: #4b824b !important;
-}
-
-/* Sticky header styles */
-.header {
-    position: sticky;
-    top: 0;
-    width: 100%;
-    z-index: 1000;
-}
-
-.header-inner {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 1rem;
-    height: 60px;
-}
-
-.logo {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #FFFAE9;
-}
-
-.nav {
-    display: flex;
-    gap: 1rem;
-}
-
-.nav-link {
-    color: #FFFAE9;
-    text-decoration: none;
-    padding: 0.3rem 0.7rem;
-    border-radius: 6px;
-    transition: background 0.2s, color 0.2s;
-}
-
-.nav-link:hover {
-    background: #fff;
-    color: #495846;
-}
-
-.logout-link:hover {
-    background: #dc2626 !important;
-    color: #fff !important;
-}
-
-.home-btn {
-    background-color: #4b824b;
-    color: #FFFAE9;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    cursor: pointer;
 }
 
 .logout-btn {

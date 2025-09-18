@@ -59,10 +59,13 @@
                   <button
                     v-if="booking.can_cancel"
                     @click="cancelBooking(booking.id)"
-                    class="ml-3 px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
+                    class="ml-3 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
                   >
-                    Cancel
+                    Cancel Booking
                   </button>
+                  <span v-else class="text-gray-400 text-xs">
+                    Cannot cancel
+                  </span>
                 </div>
               </div>
             </div>
@@ -203,6 +206,8 @@ function getStatusClass(status: string) {
     case 'pending':
       return 'bg-yellow-100 text-yellow-800';
     case 'cancelled':
+      return 'bg-red-100 text-red-800';
+    case 'rejected':
       return 'bg-red-100 text-red-800';
     case 'done':
       return 'bg-green-100 text-green-800';

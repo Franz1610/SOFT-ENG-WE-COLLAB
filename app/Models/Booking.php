@@ -52,4 +52,10 @@ class Booking extends Model
         
         return $startTime . '-' . $endTime;
     }
+
+    public function getCompanyNameAttribute(): string
+    {
+        // Generate a company name from user's name if not provided
+        return $this->first_name . ' ' . $this->last_name . ' Booking';
+    }
 }

@@ -46,6 +46,8 @@ class UserController extends Controller
         }
         $user = User::findOrFail($id);
         $user->delete();
-        return response()->json(['success' => true]);
+        
+        // Return empty response with 200 status
+        return response('', 200);
     }
 }
