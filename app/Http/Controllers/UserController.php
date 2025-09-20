@@ -50,4 +50,22 @@ class UserController extends Controller
         // Return empty response with 200 status
         return response('', 200);
     }
+
+    public function toggleBlock($id)
+    {
+        if (!Auth::user() || !Auth::user()->is_admin) {
+            abort(403);
+        }
+        
+        $user = User::findOrFail($id);
+        
+        // Toggle the blocked status
+        $user->is_blocked = !$user->is_blocked;
+        $user->save();
+        
+        // Return redirect to dashboard with fresh data
+        return redirect()->route('dashboard')->with('success', 
+            $user->is_blocked ? 'User has been blocked successfully.' : 'User has been unblocked successfully.'
+        );
+    }
 }

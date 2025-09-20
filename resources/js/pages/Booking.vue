@@ -53,7 +53,15 @@
             <div class="flex gap-3">
               <div class="flex-1">
                 <Label for="contact">Contact Number</Label>
-                <Input id="contact" v-model="form.contact" type="tel" autocomplete="tel" required />
+                <Input 
+                  id="contact" 
+                  v-model="form.contact" 
+                  type="tel" 
+                  autocomplete="tel" 
+                  pattern="[0-9]*"
+                  @input="validateContactNumber"
+                  required 
+                />
               </div>
               <div class="flex-1">
                 <Label for="email">Email</Label>
@@ -90,14 +98,20 @@
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div v-for="room in rooms" :key="room.id" @click="selectRoom(room.id)"
-            :class="['cursor-pointer transition-all border-2 rounded-xl p-4 flex flex-col items-center',
+            :class="['transition-all border-2 rounded-xl p-4 flex flex-col items-center',
               selectedRoom === room.id ? 'border-green-700 bg-green-50' : 'border-neutral-200 bg-white',
-              'hover:border-green-600',
+              room.availableRooms > 0 ? 'cursor-pointer hover:border-green-600' : 'cursor-not-allowed opacity-60',
               roomsBlinking ? 'animate-pulse' : '']">
             <img :src="room.image" :alt="room.name" class="w-48 h-36 object-cover rounded-lg mb-3" />
             <div class="text-lg font-bold text-neutral-900">{{ room.name }}</div>
-            <div class="text-sm font-medium text-neutral-600">{{ room.availability }}</div>
+            <div :class="['text-sm font-medium', getAvailabilityDisplay(room).color]">
+              {{ room.availability }}
+            </div>
             <div class="text-xs text-neutral-500 mt-1">{{ room.capacity }}</div>
+            <!-- Show maintenance info if there are rooms under maintenance -->
+            <div v-if="room.maintenanceRooms > 0" class="text-xs text-yellow-600 mt-1 font-medium">
+              {{ room.maintenanceRooms }} room{{ room.maintenanceRooms > 1 ? 's' : '' }} under maintenance
+            </div>
           </div>
         </div>
       </div>
@@ -149,8 +163,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
+
+// Get props from backend
+interface RoomCategory {
+  id: number;
+  name: string;
+  category: string;
+  totalRooms: number;
+  availableRooms: number;
+  occupiedRooms: number;
+  maintenanceRooms: number;
+  capacity: string;
+  amenities: string[];
+  description: string;
+}
+
+interface Props {
+  roomCategories: RoomCategory[];
+}
+
+const props = defineProps<Props>();
 
 // Get authentication data from Inertia
 const page = usePage();
@@ -175,34 +209,116 @@ const rooms = ref([
     id: 1,
     name: 'INDIV ROOM',
     image: '/images/booking/indiv_room.png',
-    availability: 'FULL', // Placeholder, will be dynamic
+    availability: 'Loading...', // Will be updated from props
     capacity: '1 PAX ONLY',
-    category: 'individual'
+    category: 'individual',
+    totalRooms: 12,
+    availableRooms: 0,
+    occupiedRooms: 0,
+    maintenanceRooms: 0
   },
   {
     id: 3,
     name: 'COMMON ROOM',
     image: '/images/booking/common_room.png',
-    availability: '1 ROOM VACANT', // Placeholder, will be dynamic
+    availability: 'Loading...', // Will be updated from props
     capacity: '3-5 PAX ONLY',
-    category: 'common'
+    category: 'common',
+    totalRooms: 5,
+    availableRooms: 0,
+    occupiedRooms: 0,
+    maintenanceRooms: 0
   },
   {
     id: 2,
     name: 'MASTER ROOM',
     image: '/images/booking/master_room.png',
-    availability: '3 ROOMS VACANT', // Placeholder, will be dynamic
+    availability: 'Loading...', // Will be updated from props
     capacity: '5-10 PAX ONLY',
-    category: 'master'
+    category: 'master',
+    totalRooms: 3,
+    availableRooms: 0,
+    occupiedRooms: 0,
+    maintenanceRooms: 0
   },
 ]);
 
+// Function to get availability status text and color
+const getAvailabilityDisplay = (room: any) => {
+  if (room.availableRooms === 0 && room.occupiedRooms > 0) {
+    return { text: 'FULL', color: 'text-red-600 font-bold' };
+  } else if (room.availableRooms === 0 && room.maintenanceRooms > 0) {
+    return { text: 'MAINTENANCE', color: 'text-yellow-600 font-bold' };
+  } else if (room.availableRooms === 1) {
+    return { text: '1 ROOM VACANT', color: 'text-green-600 font-medium' };
+  } else if (room.availableRooms > 1) {
+    return { text: `${room.availableRooms} ROOMS VACANT`, color: 'text-green-600 font-medium' };
+  } else {
+    return { text: 'NO ROOMS AVAILABLE', color: 'text-red-600 font-bold' };
+  }
+};
+
+// Function to update room availability from props
+const updateRoomAvailability = () => {
+  console.log('Room categories from props:', props.roomCategories);
+  
+  rooms.value.forEach(room => {
+    const roomData = props.roomCategories.find(data => data.category === room.category);
+    if (roomData) {
+      console.log(`Updating ${room.category} room:`, roomData);
+      room.totalRooms = roomData.totalRooms;
+      room.availableRooms = roomData.availableRooms;
+      room.occupiedRooms = roomData.occupiedRooms;
+      room.maintenanceRooms = roomData.maintenanceRooms;
+      
+      // Update availability text
+      const display = getAvailabilityDisplay(room);
+      room.availability = display.text;
+      console.log(`${room.category} availability: ${room.availability}`);
+    } else {
+      console.log(`No data found for ${room.category}`);
+      room.availability = 'No data available';
+    }
+  });
+};
+
+// Update room availability on component mount
+onMounted(() => {
+  updateRoomAvailability();
+});
+
 const selectedRoom = ref<number|null>(null);
+
 function selectRoom(id: number) {
+  // Find the room data
+  const room = rooms.value.find(r => r.id === id);
+  
+  // Check if room is available for booking
+  if (room && room.availableRooms === 0) {
+    // Show alert for unavailable rooms
+    if (room.occupiedRooms > 0) {
+      alert('This room type is currently full. Please select another room or try again later.');
+    } else if (room.maintenanceRooms > 0) {
+      alert('This room type is currently under maintenance. Please select another room.');
+    } else {
+      alert('This room type is currently unavailable. Please select another room.');
+    }
+    return;
+  }
+  
   selectedRoom.value = id;
   // Hide room alert when a room is selected
   showRoomAlert.value = false;
   roomsBlinking.value = false;
+}
+
+// Function to validate contact number input (numbers only)
+function validateContactNumber(event: Event) {
+  const target = event.target as HTMLInputElement;
+  // Remove any non-numeric characters
+  target.value = target.value.replace(/[^0-9]/g, '');
+  // Update the form value
+  form.value.contact = target.value;
 }
 
 

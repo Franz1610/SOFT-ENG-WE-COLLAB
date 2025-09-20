@@ -7,21 +7,21 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
 
-Route::get('dashboard', function () {
-    $user = auth()->user();
-    if (!$user || !$user->is_admin) {
-        auth()->logout();
-        return redirect('/login');
-    }
-    $users = \App\Models\User::all();
-    return Inertia::render('admin/Dashboard', [
-        'users' => $users,
-    ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Public API for room availability (accessible without auth)
+Route::get('/api/room-availability', [\App\Http\Controllers\RoomManagementController::class, 'getRoomCategories']);
+
+Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])->name('dashboard');
 
 
 Route::get('/booking', function () {
-    return Inertia::render('Booking');
+    // Get room availability data
+    $controller = new \App\Http\Controllers\RoomManagementController();
+    $roomCategories = $controller->getRoomCategories();
+    
+    return Inertia::render('Booking', [
+        'roomCategories' => $roomCategories
+    ]);
 })->middleware(['auth', 'verified']);
 
 Route::get('/booking/schedule', function () {
@@ -56,8 +56,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/users/{id}/edit', [\App\Http\Controllers\UserController::class, 'edit']);
         Route::put('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'update']);
         Route::delete('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy']);
+        Route::post('/admin/users/{id}/toggle-block', [\App\Http\Controllers\UserController::class, 'toggleBlock']);
         
         Route::get('/admin/bookings', function () {
+            // First, update bookings that have passed their end time to 'completed'
+            $now = \Carbon\Carbon::now();
+            $today = $now->toDateString();
+            $currentTime = $now->toTimeString();
+            
+            // Update confirmed bookings that have ended
+            \App\Models\Booking::where('status', 'confirmed')
+                ->where(function ($query) use ($today, $currentTime) {
+                    $query->where('booking_date', '<', $today)
+                          ->orWhere(function ($q) use ($today, $currentTime) {
+                              $q->where('booking_date', '=', $today)
+                                ->where('end_time', '<', $currentTime);
+                          });
+                })
+                ->update(['status' => 'completed']);
+            
             $bookings = \App\Models\Booking::with('user')
                 ->orderBy('booking_date', 'desc')
                 ->orderBy('start_time', 'desc')
@@ -87,8 +104,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]);
         });
         
-        Route::get('/admin/rooms', function () {
-            return Inertia::render('admin/RoomManagement');
+        Route::get('/admin/rooms', [\App\Http\Controllers\RoomManagementController::class, 'index']);
+        Route::get('/admin/rooms/{category}', [\App\Http\Controllers\RoomManagementController::class, 'getRoomData']);
+        Route::post('/admin/rooms/maintenance', [\App\Http\Controllers\RoomManagementController::class, 'updateMaintenanceStatus']);
+        Route::get('/admin/debug-bookings', function () {
+            $today = \Carbon\Carbon::today();
+            $allBookings = \App\Models\Booking::where('status', 'confirmed')
+                ->get(['id', 'category', 'room_id', 'first_name', 'last_name', 'booking_date', 'status', 'start_time', 'end_time']);
+            
+            $todayBookings = \App\Models\Booking::where('booking_date', $today)
+                ->where('status', 'confirmed')
+                ->get(['id', 'category', 'room_id', 'first_name', 'last_name', 'booking_date', 'status', 'start_time', 'end_time']);
+            
+            return response()->json([
+                'today' => $today->toDateString(),
+                'server_timezone' => config('app.timezone'),
+                'current_time' => now()->toDateTimeString(),
+                'confirmed_bookings_today' => $todayBookings,
+                'all_confirmed_bookings' => $allBookings
+            ]);
         });
         
         // Admin booking management routes

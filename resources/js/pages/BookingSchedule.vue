@@ -49,6 +49,7 @@
                   type="number" 
                   min="01" 
                   max="12" 
+                  placeholder="01"
                   class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
                   @input="formatTimeInput($event, 'startTime', 'hour')"
                 />
@@ -58,6 +59,7 @@
                   type="number" 
                   min="00" 
                   max="59" 
+                  placeholder="00"
                   class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
                   @input="formatTimeInput($event, 'startTime', 'minute')"
                 />
@@ -82,6 +84,7 @@
                   type="number" 
                   min="01" 
                   max="12" 
+                  placeholder="01"
                   class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
                   @input="formatTimeInput($event, 'endTime', 'hour')"
                 />
@@ -91,6 +94,7 @@
                   type="number" 
                   min="00" 
                   max="59" 
+                  placeholder="00"
                   class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
                   @input="formatTimeInput($event, 'endTime', 'minute')"
                 />
@@ -207,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -228,13 +232,13 @@ const user = computed(() => page.props.auth.user);
 const form = ref({
   date: '',
   startTime: {
-    hour: '00',
-    minute: '00',
+    hour: '',
+    minute: '',
     period: 'AM'
   },
   endTime: {
-    hour: '00',
-    minute: '00',
+    hour: '',
+    minute: '',
     period: 'AM'
   }
 });
@@ -242,11 +246,111 @@ const form = ref({
 // Modal state
 const showConfirmationModal = ref(false);
 const showLogoutModal = ref(false);
+const isValidating = ref(false);
 
-// Set minimum date to today
+// Set minimum date to today in Asia/Manila timezone
 const minDate = computed(() => {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+  // Get current date in Asia/Manila timezone using Intl.DateTimeFormat
+  const now = new Date();
+  const manilaDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+  return manilaDate; // Returns YYYY-MM-DD format
+});
+
+// Helper function to convert 12-hour to 24-hour format
+function convertTo24Hour(hour: string, period: string): number {
+  let hour24 = parseInt(hour);
+  if (period === 'AM' && hour24 === 12) {
+    hour24 = 0;
+  } else if (period === 'PM' && hour24 !== 12) {
+    hour24 += 12;
+  }
+  return hour24;
+}
+
+// Validate time for today's bookings
+function validateTimeForToday() {
+  if (!form.value.date || isValidating.value) return true;
+  
+  const selectedDate = new Date(form.value.date);
+  // Get current Manila date
+  const now = new Date();
+  const manilaDateString = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+  
+  const manilaToday = new Date(manilaDateString);
+  selectedDate.setHours(0, 0, 0, 0);
+  manilaToday.setHours(0, 0, 0, 0);
+  
+  // Only validate time if the selected date is today
+  if (selectedDate.getTime() === manilaToday.getTime()) {
+    // Get current Manila time
+    const manilaTimeString = now.toLocaleString("en-US", {
+      timeZone: "Asia/Manila",
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const [currentHour, currentMinute] = manilaTimeString.split(':').map(Number);
+    
+    // Validate start time
+    if (form.value.startTime.hour && form.value.startTime.minute && form.value.startTime.period) {
+      const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
+      const startMinute = parseInt(form.value.startTime.minute);
+      
+      if (startHour24 < currentHour || (startHour24 === currentHour && startMinute <= currentMinute)) {
+        isValidating.value = true;
+        alert('Cannot select past time for today. Please choose a future time.');
+        setTimeout(() => {
+          isValidating.value = false;
+        }, 100);
+        return false;
+      }
+    }
+    
+    // Validate end time
+    if (form.value.endTime.hour && form.value.endTime.minute && form.value.endTime.period) {
+      const endHour24 = convertTo24Hour(form.value.endTime.hour, form.value.endTime.period);
+      const endMinute = parseInt(form.value.endTime.minute);
+      
+      if (endHour24 < currentHour || (endHour24 === currentHour && endMinute <= currentMinute)) {
+        isValidating.value = true;
+        alert('Cannot select past time for today. Please choose a future time.');
+        setTimeout(() => {
+          isValidating.value = false;
+        }, 100);
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Watch for date changes and prevent past date selection
+watch(() => form.value.date, (newDate) => {
+  if (newDate) {
+    // Get current Manila date
+    const now = new Date();
+    const manilaDateString = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now);
+    
+    if (newDate < manilaDateString) {
+      form.value.date = '';
+      alert('Cannot select past dates. Please choose today or a future date.');
+    }
+  }
 });
 
 // Format time input to ensure 2 digits
@@ -273,8 +377,112 @@ function formatTimeDisplay(timeObj: { hour: string; minute: string; period: stri
 }
 
 function submitSchedule() {
-  if (!form.value.date || !form.value.startTime.hour || !form.value.endTime.hour) {
-    alert('Please select date, start time, and end time');
+  console.log('=== SUBMIT SCHEDULE CALLED ===');
+  console.log('Form data:', form.value);
+  
+  // Better validation for required fields
+  if (!form.value.date) {
+    alert('Please select a date');
+    return;
+  }
+  
+  if (!form.value.startTime.hour || !form.value.startTime.minute) {
+    alert('Please select start time');
+    return;
+  }
+  
+  if (!form.value.endTime.hour || !form.value.endTime.minute) {
+    alert('Please select end time');
+    return;
+  }
+  
+  // Check if selected date is in the past
+  const selectedDate = new Date(form.value.date);
+  
+  // Get current date and time in Asia/Manila timezone using Intl API
+  const now = new Date();
+  const manilaDateString = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+  
+  const manilaTimeString = now.toLocaleString("en-US", {
+    timeZone: "Asia/Manila",
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const selectedDateString = form.value.date;
+  
+  console.log('Today (Manila timezone):', manilaDateString);
+  console.log('Current Manila time:', manilaTimeString);
+  console.log('Selected date:', selectedDateString);
+  
+  if (selectedDateString < manilaDateString) {
+    alert('Cannot book for past dates. Please select today or a future date.');
+    return;
+  }
+  
+  // Check if selected time is in the past (only for today)
+  if (selectedDateString === manilaDateString) {
+    console.log('=== TIME VALIDATION FOR TODAY ===');
+    console.log('Original browser time:', now.toLocaleString());
+    console.log('Manila date:', manilaDateString);
+    console.log('Manila time:', manilaTimeString);
+    
+    const [currentHour, currentMinute] = manilaTimeString.split(':').map(Number);
+    
+    console.log('Current time (Manila):', currentHour + ':' + currentMinute);
+    console.log('Selected start time:', form.value.startTime);
+    console.log('Selected end time:', form.value.endTime);
+    
+    const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
+    const startMinute = parseInt(form.value.startTime.minute);
+    const endHour24 = convertTo24Hour(form.value.endTime.hour, form.value.endTime.period);
+    const endMinute = parseInt(form.value.endTime.minute);
+    
+    console.log('Converted start time 24h:', startHour24 + ':' + startMinute);
+    console.log('Converted end time 24h:', endHour24 + ':' + endMinute);
+    
+    // Check start time
+    const startIsPast = startHour24 < currentHour || (startHour24 === currentHour && startMinute < currentMinute);
+    console.log('Start time is past?', startIsPast);
+    
+    if (startIsPast) {
+      console.log('BLOCKING: Start time is in the past');
+      alert('Cannot book past time for today. Please select a future time.');
+      return;
+    }
+    
+    // Check end time
+    const endIsPast = endHour24 < currentHour || (endHour24 === currentHour && endMinute < currentMinute);
+    console.log('End time is past?', endIsPast);
+    
+    if (endIsPast) {
+      console.log('BLOCKING: End time is in the past');
+      alert('End time cannot be in the past for today. Please select a future time.');
+      return;
+    }
+    
+    console.log('=== TIME VALIDATION PASSED ===');
+  } else {
+    console.log('Date is not today, skipping time validation');
+  }
+  
+  // Validate that end time is after start time
+  const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
+  const startMinute = parseInt(form.value.startTime.minute);
+  const endHour24 = convertTo24Hour(form.value.endTime.hour, form.value.endTime.period);
+  const endMinute = parseInt(form.value.endTime.minute);
+  
+  const startTotalMinutes = startHour24 * 60 + startMinute;
+  const endTotalMinutes = endHour24 * 60 + endMinute;
+  
+  if (endTotalMinutes <= startTotalMinutes) {
+    alert('End time must be after start time.');
     return;
   }
   
