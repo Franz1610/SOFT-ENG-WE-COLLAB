@@ -44,7 +44,27 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'role' => $request->user()->role,
+                    'role_display' => $request->user()->getRoleDisplayName(),
+                    'is_admin' => $request->user()->is_admin,
+                    'is_blocked' => $request->user()->is_blocked,
+                    'permissions' => [
+                        'can_access_dashboard' => $request->user()->canAccessDashboard(),
+                        'can_manage_bookings' => $request->user()->canManageBookings(),
+                        'can_manage_rooms' => $request->user()->canManageRooms(),
+                        'can_access_finance' => $request->user()->canAccessFinance(),
+                        'can_manage_users' => $request->user()->canManageUsers(),
+                        'can_manage_roles' => $request->user()->canManageRoles(),
+                        'can_block_users' => $request->user()->canBlockUsers(),
+                        'is_admin' => $request->user()->isAdmin(),
+                        'is_admin_officer' => $request->user()->isAdminOfficer(),
+                        'has_admin_access' => $request->user()->hasAdminAccess(),
+                    ]
+                ] : null,
             ],
             'ziggy' => [
                 ...(new Ziggy)->toArray(),

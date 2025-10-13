@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Database\Seeders\RoomSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -34,5 +35,8 @@ class DatabaseSeeder extends Seeder
                 'is_admin' => true,
             ]);
         }
+
+        // Seed initial rooms inventory
+        $this->call(RoomSeeder::class);
     }
 }

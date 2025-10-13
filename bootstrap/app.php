@@ -22,9 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // Register 'admin' middleware alias
+        // Register middleware aliases
         $middleware->alias([
-            'admin' => \App\Http\Middleware\AdminOnly::class,
+            'auth' => \App\Http\Middleware\Authenticate::class,
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'admin_officer' => \App\Http\Middleware\AdminOfficerMiddleware::class,
+            'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

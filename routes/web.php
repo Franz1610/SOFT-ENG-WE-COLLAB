@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\Admin\TransactionController;
+use App\Http\Controllers\Admin\UserRoleController;
 
 Route::get('/', function () {
     return Inertia::render('Home');
@@ -51,13 +54,9 @@ Route::post('/booking/{id}/cancel', [\App\Http\Controllers\BookingController::cl
     ->middleware(['auth', 'verified']);
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Routes for both Admin and Admin Officer (general admin access)
     Route::middleware('admin')->group(function () {
-        Route::get('/admin/users', [\App\Http\Controllers\UserController::class, 'index']);
-        Route::get('/admin/users/{id}/edit', [\App\Http\Controllers\UserController::class, 'edit']);
-        Route::put('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'update']);
-        Route::delete('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy']);
-        Route::post('/admin/users/{id}/toggle-block', [\App\Http\Controllers\UserController::class, 'toggleBlock']);
-        
+        // Dashboard access - both admin and admin officer
         Route::get('/admin/bookings', function () {
             // First, update bookings that have passed their end time to 'completed'
             $now = \Carbon\Carbon::now();
@@ -104,9 +103,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]);
         });
         
+        // Room management - both admin and admin officer
         Route::get('/admin/rooms', [\App\Http\Controllers\RoomManagementController::class, 'index']);
         Route::get('/admin/rooms/{category}', [\App\Http\Controllers\RoomManagementController::class, 'getRoomData']);
         Route::post('/admin/rooms/maintenance', [\App\Http\Controllers\RoomManagementController::class, 'updateMaintenanceStatus']);
+        
+        // Booking management - both admin and admin officer
+        Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);
+        Route::post('/admin/bookings/{id}/reject', [\App\Http\Controllers\BookingController::class, 'reject']);
+        Route::post('/admin/bookings/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'adminCancel']);
+        
+        // Debug route - both admin and admin officer
         Route::get('/admin/debug-bookings', function () {
             $today = \Carbon\Carbon::today();
             $allBookings = \App\Models\Booking::where('status', 'confirmed')
@@ -124,11 +131,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'all_confirmed_bookings' => $allBookings
             ]);
         });
+    });
+    
+    // Routes for Admin and Admin Officer (user management)
+    Route::middleware('admin')->group(function () {
+        Route::get('/admin/users', [\App\Http\Controllers\UserController::class, 'index']);
+        Route::get('/admin/users/{id}/edit', [\App\Http\Controllers\UserController::class, 'edit']);
+        Route::put('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'update']);
+        Route::delete('/admin/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy']);
+        Route::post('/admin/users/{id}/toggle-block', [\App\Http\Controllers\UserController::class, 'toggleBlock']);
+    });
+
+    // Routes ONLY for Admin Officer (role management)
+    Route::middleware('admin_officer')->group(function () {
+        Route::get('/admin/user-roles', [\App\Http\Controllers\Admin\UserRoleController::class, 'index'])->name('admin.user-roles.index');
+        Route::post('/admin/users/{id}/role', [\App\Http\Controllers\Admin\UserRoleController::class, 'updateRole'])->name('admin.users.update-role');
+    });
+
+    // Routes ONLY for Admin Officer (finance access)
+    Route::middleware('admin_officer')->group(function () {
+        Route::get('/admin/finance', [FinanceController::class, 'index'])->name('admin.finance.index');
+        Route::get('/admin/finance/create', [FinanceController::class, 'create'])->name('admin.finance.create');
+        Route::post('/admin/finance', [FinanceController::class, 'store'])->name('admin.finance.store');
+        Route::post('/admin/finance/{id}/verify', [FinanceController::class, 'verify'])->name('admin.finance.verify');
         
-        // Admin booking management routes
-        Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);
-        Route::post('/admin/bookings/{id}/reject', [\App\Http\Controllers\BookingController::class, 'reject']);
-        Route::post('/admin/bookings/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'adminCancel']);
+        // Transaction management routes
+        Route::post('/admin/finance/transactions', [FinanceController::class, 'storeTransaction'])->name('admin.finance.transactions.store');
+        Route::put('/admin/finance/transactions/{id}', [FinanceController::class, 'updateTransaction'])->name('admin.finance.transactions.update');
+        Route::delete('/admin/finance/transactions/{id}', [FinanceController::class, 'deleteTransaction'])->name('admin.finance.transactions.delete');
     });
 });
 

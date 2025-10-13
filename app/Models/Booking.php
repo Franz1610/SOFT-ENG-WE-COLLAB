@@ -34,6 +34,16 @@ class Booking extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function financeEntry()
+    {
+        return $this->hasOne(FinanceEntry::class);
+    }
+
+    public function room()
+    {
+        return $this->belongsTo(Room::class);
+    }
+
     public function getRoomNameAttribute(): string
     {
         $roomNames = [
@@ -57,5 +67,24 @@ class Booking extends Model
     {
         // Generate a company name from user's name if not provided
         return $this->first_name . ' ' . $this->last_name . ' Booking';
+    }
+
+    public function getTotalPriceAttribute(): float
+    {
+        // Calculate total price based on room rate and duration
+        // This is a simple calculation - you can modify based on your pricing logic
+        $roomRates = [
+            1 => 50.00, // Individual Room rate per hour
+            2 => 100.00, // Master Room rate per hour  
+            3 => 75.00, // Common Room rate per hour
+        ];
+
+        $startTime = \Carbon\Carbon::parse($this->start_time);
+        $endTime = \Carbon\Carbon::parse($this->end_time);
+        $hours = $endTime->diffInHours($startTime);
+        
+        $hourlyRate = $roomRates[$this->room_id] ?? 50.00;
+        
+        return $hours * $hourlyRate;
     }
 }

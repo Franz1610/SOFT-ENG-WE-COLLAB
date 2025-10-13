@@ -53,19 +53,26 @@ class UserController extends Controller
 
     public function toggleBlock($id)
     {
-        if (!Auth::user() || !Auth::user()->is_admin) {
-            abort(403);
+        $currentUser = Auth::user();
+        
+        if (!$currentUser || !$currentUser->hasAdminAccess()) {
+            abort(403, 'Admin access required');
         }
         
-        $user = User::findOrFail($id);
+        $targetUser = User::findOrFail($id);
+        
+        // Check if the target user can be blocked by the current user
+        if (!$targetUser->canBeBlockedBy($currentUser)) {
+            abort(403, 'You do not have permission to block this user');
+        }
         
         // Toggle the blocked status
-        $user->is_blocked = !$user->is_blocked;
-        $user->save();
+        $targetUser->is_blocked = !$targetUser->is_blocked;
+        $targetUser->save();
         
         // Return redirect to dashboard with fresh data
         return redirect()->route('dashboard')->with('success', 
-            $user->is_blocked ? 'User has been blocked successfully.' : 'User has been unblocked successfully.'
+            $targetUser->is_blocked ? 'User has been blocked successfully.' : 'User has been unblocked successfully.'
         );
     }
 }

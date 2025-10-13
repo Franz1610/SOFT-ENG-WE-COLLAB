@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { defineProps, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { defineProps, ref, computed } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import {
   Dialog,
   DialogContent,
@@ -17,13 +17,36 @@ interface User {
     email: string;
     is_admin: boolean;
     is_blocked?: boolean;
+    role?: string;
 }
 
 const props = defineProps<{ users: User[] }>();
 
+// Get current user data from Inertia shared data
+const page = usePage();
+const currentUser = computed(() => page.props.auth?.user);
+
 // Modal state
 const showBlockModal = ref(false);
 const userToBlock = ref<User | null>(null);
+
+// Function to check if current user can block the target user
+function canBlockUser(targetUser: User): boolean {
+    if (!currentUser.value) return false;
+    
+    // Admin Officers can block anyone (including Admins)
+    if (currentUser.value.role === 'admin_officer') {
+        return true;
+    }
+    
+    // Base Admins can only block regular users, NOT Admin Officers
+    if (currentUser.value.role === 'admin') {
+        return targetUser.role !== 'admin_officer';
+    }
+    
+    // Regular users cannot block anyone
+    return false;
+}
 
 function editUser(userId: number) {
     router.visit(`/admin/users/${userId}/edit`);
@@ -68,7 +91,7 @@ function confirmToggleBlock() {
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Admin</th>
+                    <th>Role</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -77,7 +100,11 @@ function confirmToggleBlock() {
                 <tr v-for="user in props.users" :key="user.id">
                     <td>{{ user.name }}</td>
                     <td>{{ user.email }}</td>
-                    <td>{{ user.is_admin ? 'Yes' : 'No' }}</td>
+                    <td>
+                        <span v-if="user.role === 'admin_officer'" class="text-purple-300 font-bold">Admin Officer</span>
+                        <span v-else-if="user.is_admin" class="text-blue-300 font-bold">Admin</span>
+                        <span v-else class="text-gray-300">User</span>
+                    </td>
                     <td>
                         <span :class="user.is_blocked ? 'text-red-300 font-bold' : 'text-green-300 font-bold'">
                             {{ user.is_blocked ? 'Blocked' : 'Active' }}
@@ -92,6 +119,7 @@ function confirmToggleBlock() {
                                 Edit
                             </button>
                             <button 
+                                v-if="canBlockUser(user)"
                                 @click="openBlockModal(user)"
                                 :class="user.is_blocked 
                                     ? 'px-3 py-2 bg-green-500 text-white text-sm rounded hover:bg-green-600 transition-colors font-medium'
@@ -99,6 +127,13 @@ function confirmToggleBlock() {
                             >
                                 {{ user.is_blocked ? 'Unblock' : 'Block' }}
                             </button>
+                            <span 
+                                v-else-if="!canBlockUser(user) && (user.role === 'admin_officer' || user.is_admin)"
+                                class="px-3 py-2 bg-gray-400 text-white text-sm rounded cursor-not-allowed opacity-60 font-medium"
+                                title="You don't have permission to block this user"
+                            >
+                                {{ user.is_blocked ? 'Unblock' : 'Block' }}
+                            </span>
                         </div>
                     </td>
                 </tr>
@@ -122,7 +157,11 @@ function confirmToggleBlock() {
                              :class="userToBlock.is_blocked ? 'bg-green-50' : 'bg-red-50'">
                             <div><strong>Name:</strong> {{ userToBlock.name }}</div>
                             <div><strong>Email:</strong> {{ userToBlock.email }}</div>
-                            <div><strong>Admin:</strong> {{ userToBlock.is_admin ? 'Yes' : 'No' }}</div>
+                            <div><strong>Role:</strong> 
+                                <span v-if="userToBlock.role === 'admin_officer'" class="text-purple-600 font-bold">Admin Officer</span>
+                                <span v-else-if="userToBlock.is_admin" class="text-blue-600 font-bold">Admin</span>
+                                <span v-else class="text-gray-600">User</span>
+                            </div>
                             <div><strong>Current Status:</strong> 
                                 <span :class="userToBlock.is_blocked ? 'text-red-600 font-bold' : 'text-green-600 font-bold'">
                                     {{ userToBlock.is_blocked ? 'Blocked' : 'Active' }}

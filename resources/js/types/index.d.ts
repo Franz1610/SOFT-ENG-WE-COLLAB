@@ -33,6 +33,22 @@ export interface User {
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;
+    role: 'user' | 'admin' | 'admin_officer';
+    role_display: string;
+    is_admin: boolean;
+    is_blocked: boolean;
+    permissions?: {
+        can_access_dashboard: boolean;
+        can_manage_bookings: boolean;
+        can_manage_rooms: boolean;
+        can_access_finance: boolean;
+        can_manage_users: boolean;
+        can_manage_roles: boolean;
+        can_block_users: boolean;
+        is_admin: boolean;
+        is_admin_officer: boolean;
+        has_admin_access: boolean;
+    };
 }
 
 export type BreadcrumbItemType = BreadcrumbItem;
