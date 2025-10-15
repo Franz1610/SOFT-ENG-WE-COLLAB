@@ -131,11 +131,11 @@
       <!-- Floating Create Survey button -->
       <button
         class="create-survey-btn"
-        @click="createSurvey"
-        aria-label="Create a Survey"
+        @click="createFeedback"
+        aria-label="Submit Feedback"
       >
         <span class="plus">+</span>
-        <span class="label">Create a Survey!</span>
+        <span class="label">Submit Feedback!</span>
       </button>
     </main>
 
@@ -576,7 +576,7 @@ section > .testimonial-slide {
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Link, router, usePage } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import {
   Dialog,
   DialogContent,
@@ -612,6 +612,17 @@ function handleAuthAction() {
     handleLogout();
   } else {
     router.visit('/login');
+  }
+}
+
+// --- FIXED LOGIC: Link to feedback submission ---
+function createFeedback() {
+  // If user is authenticated, go to feedback create page.
+  // Otherwise redirect to login and include intended redirect so user returns after login.
+  if (user.value && user.value) {
+    router.visit('/feedback/create');
+  } else {
+    router.visit('/login?redirect=/feedback/create');
   }
 }
 
@@ -661,7 +672,7 @@ const visibleSlides = computed(() => {
   const total = reviews.length
   for (let i = -2; i <= 2; i++) {
     // Always wrap around for infinite effect, no empty slots
-    let idx = (currentIndex.value + i + total) % total
+    const idx = (currentIndex.value + i + total) % total
     slides.push(reviews[idx])
   }
   return slides
@@ -687,7 +698,7 @@ function getCardStyle(idx: number) {
     borderRadius: '18px',
     boxShadow: '0 2px 12px rgba(0,0,0,0.10)',
     padding: '24px 18px',
-    position: 'relative', // Set position as string value
+    position: 'relative' as const, // Set position as a valid CSS property
     zIndex: 1,
     marginLeft: '-80px',
     marginRight: '-80px',
@@ -726,19 +737,10 @@ function getCardStyle(idx: number) {
   return {
     ...base,
     opacity: 0,
-    pointerEvents: 'none'
+    pointerEvents: 'none' as any
   }
 }
 
 import { router } from '@inertiajs/vue3';
 
-function createSurvey() {
-  // If user is authenticated, go to survey create page.
-  // Otherwise redirect to login and include intended redirect so user returns after login.
-  if (user && user.value) {
-    router.visit('/survey/create');
-  } else {
-    router.visit('/login?redirect=/survey/create');
-  }
-}
 </script>

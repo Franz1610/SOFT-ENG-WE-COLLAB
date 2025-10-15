@@ -140,9 +140,6 @@ const cards = [
 
 const selected = ref<number|null>(0);
 
-function selectCard(idx: number) {
-  selected.value = idx;
-}
 
 // --- NEW / updated: modal + feedback state & handlers ---
 const showModal = ref(false);
@@ -180,25 +177,17 @@ function setRating(n: number) {
 }
 
 function submitFeedback() {
-  // client-side validation: require rating and comment
-  if (!isValid.value) {
-    // prevent submission; submit button is disabled while invalid,
-    // but keep guard here to be safe.
-    return;
-  }
+  if (!isValid.value) return;
 
-  // Placeholder: log feedback. Replace with router.post(...) to persist.
-  const payload = {
-    template: modalKey.value,
-    title: modalTitle.value,
+  router.post('/feedback', {
+    type: modalKey.value,
     rating: rating.value,
-    comment: comment.value,
-    created_at: new Date().toISOString()
-  };
-  console.log('Survey feedback submitted (placeholder):', payload);
-
-  // show thank-you message inside modal
-  showThanks.value = true;
+    comments: comment.value,
+  }, {
+    onSuccess: () => {
+      showThanks.value = true;
+    }
+  });
 }
 // --- END NEW ---
 </script>

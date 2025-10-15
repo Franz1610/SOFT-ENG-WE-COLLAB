@@ -10,8 +10,14 @@ use Illuminate\Support\Facades\Auth;
 
 class FinanceController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        // Get filter values from request
+        $type = $request->input('type');
+        $category = $request->input('category');
+        $start_date = $request->input('start_date');
+        $end_date = $request->input('end_date');
+
         // Get all finance entries with their relationships
         $financeEntries = FinanceEntry::with(['booking.user', 'creator'])
             ->orderBy('transaction_date', 'desc')
@@ -58,10 +64,28 @@ class FinanceController extends Controller
             ->sortByDesc('date')
             ->values();
 
-        // Calculate summary statistics
-        $totalIncome = $allTransactions->where('type', 'income')->sum('amount');
-        $totalExpenses = $allTransactions->where('type', 'expense')->sum('amount');
-        $netRevenue = $financeEntries->sum('net_revenue');
+        // --- Apply filters ---
+        $filteredTransactions = $allTransactions->filter(function ($t) use ($type, $category, $start_date, $end_date) {
+            $match = true;
+            if ($type) {
+                $match = $match && ($t['type'] === $type);
+            }
+            if ($category) {
+                $match = $match && ($t['category'] === $category);
+            }
+            if ($start_date) {
+                $match = $match && ($t['date'] >= $start_date);
+            }
+            if ($end_date) {
+                $match = $match && ($t['date'] <= $end_date);
+            }
+            return $match;
+        })->values();
+
+        // Calculate summary statistics for filtered transactions
+        $totalIncome = $filteredTransactions->where('type', 'income')->sum('amount');
+        $totalExpenses = $filteredTransactions->where('type', 'expense')->sum('amount');
+        $netRevenue = $filteredTransactions->where('source', 'finance_entry')->sum('amount');
         
         $summary = [
             'income' => $totalIncome,
@@ -75,7 +99,7 @@ class FinanceController extends Controller
         $expenseCategories = ['Maintenance', 'Utilities', 'Supplies', 'Staff Salary'];
 
         return inertia('admin/Finance', [
-            'transactions' => $allTransactions,
+            'transactions' => $filteredTransactions,
             'summary' => $summary,
             'incomeCategories' => $incomeCategories,
             'expenseCategories' => $expenseCategories,

@@ -5,6 +5,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\UserRoleController;
+use App\Http\Controllers\Admin\FeedbackController;
 
 Route::get('/', function () {
     return Inertia::render('Home');
@@ -160,12 +161,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/admin/finance/transactions/{id}', [FinanceController::class, 'updateTransaction'])->name('admin.finance.transactions.update');
         Route::delete('/admin/finance/transactions/{id}', [FinanceController::class, 'deleteTransaction'])->name('admin.finance.transactions.delete');
     });
+
+    // Feedback Management routes for Admin Officer
+    Route::middleware(['auth', 'admin_officer'])->prefix('admin')->group(function () {
+        Route::get('feedback', [FeedbackController::class, 'index'])->name('admin.feedback.index');
+        Route::delete('feedback/{id}', [FeedbackController::class, 'destroy'])->name('admin.feedback.destroy');
+    });
 });
 
 // Serve the survey create page to match resources/js/pages/survey/Create.vue (requires auth)
 Route::get('/survey/create', function () {
     return Inertia::render('Create');
 })->middleware(['auth', 'verified']);
+
+// Feedback routes
+Route::middleware(['auth'])->group(function () {
+    Route::get('/feedback/create', function () {
+        return Inertia::render('Create');
+    })->name('feedback.create');
+    Route::post('/feedback', [\App\Http\Controllers\FeedbackSubmissionController::class, 'store'])->name('feedback.store');
+});
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

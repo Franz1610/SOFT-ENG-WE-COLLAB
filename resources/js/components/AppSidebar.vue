@@ -4,7 +4,7 @@ import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
-import { Folder, LayoutGrid, Calendar, Building, UserCheck } from 'lucide-vue-next';
+import { Folder, LayoutGrid, Calendar, Building, UserCheck, MessageSquare } from 'lucide-vue-next';
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -49,6 +49,15 @@ const mainNavItems = computed((): NavItem[] => {
             title: 'Finance Management',
             href: '/admin/finance',
             icon: Folder,
+        });
+    }
+
+    // Feedback Management - only available to admin officer
+    if (user.value.permissions?.is_admin_officer) {
+        items.push({
+            title: 'Feedback Management',
+            href: '/admin/feedback',
+            icon: MessageSquare,
         });
     }
 

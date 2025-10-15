@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps<{
@@ -149,14 +149,43 @@ const filterType = ref('');
 const filterCategory = ref('');
 const filterStart = ref('');
 const filterEnd = ref('');
+const filteredTransactions = ref(props.transactions);
+const filteredSummary = ref(props.summary);
+const loading = ref(false);
+
 function applyFilters() {
+  loading.value = true;
   router.get('/admin/finance', {
     type: filterType.value,
     category: filterCategory.value,
     start_date: filterStart.value,
     end_date: filterEnd.value
+  }, {
+    preserveState: true,
+    replace: false,
+    onSuccess: (page) => {
+      filteredTransactions.value = page.props.transactions as any[];
+      filteredSummary.value = page.props.summary as { income: number; expense: number; net: number; revenue: number };
+      loading.value = false;
+    },
+    onError: () => {
+      loading.value = false;
+    }
   });
 }
+
+function resetFilters() {
+  filterType.value = '';
+  filterCategory.value = '';
+  filterStart.value = '';
+  filterEnd.value = '';
+  applyFilters();
+}
+
+onMounted(() => {
+  filteredTransactions.value = props.transactions;
+  filteredSummary.value = props.summary;
+});
 
 // Helper function to format date for display (M-D-Y)
 function formatDate(dateString: string) {
@@ -205,19 +234,19 @@ function capitalizeFirst(str: string) {
       <div class="grid auto-rows-min gap-4 md:grid-cols-4 mb-8">
         <div class="stats-card income">
           <div class="card-title">Total Income</div>
-          <div class="card-value">₱{{ summary.income }}</div>
+          <div class="card-value">₱{{ filteredSummary.income }}</div>
         </div>
         <div class="stats-card expense">
           <div class="card-title">Total Expenses</div>
-          <div class="card-value">₱{{ summary.expense }}</div>
+          <div class="card-value">₱{{ filteredSummary.expense }}</div>
         </div>
         <div class="stats-card net">
           <div class="card-title">Net Balance</div>
-          <div class="card-value">₱{{ summary.net }}</div>
+          <div class="card-value">₱{{ filteredSummary.net }}</div>
         </div>
         <div class="stats-card revenue">
           <div class="card-title">Revenue</div>
-          <div class="card-value">₱{{ summary.revenue }}</div>
+          <div class="card-value">₱{{ filteredSummary.revenue }}</div>
         </div>
       </div>
 
@@ -240,7 +269,8 @@ function capitalizeFirst(str: string) {
           To:
           <input v-model="filterEnd" type="date" />
         </label>
-        <button @click="applyFilters" class="filter-btn">Filter</button>
+        <button @click="applyFilters" class="filter-btn" :disabled="loading">Filter</button>
+        <button @click="resetFilters" class="filter-btn" :disabled="loading" style="background:#cfcfcf; color:#333;">Reset Filter</button>
       </div>
 
       <!-- Transactions Table -->
@@ -258,7 +288,7 @@ function capitalizeFirst(str: string) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in transactions" :key="t.id">
+            <tr v-for="t in filteredTransactions" :key="t.id">
               <td>{{ formatDate(t.date) }}</td>
               <td>{{ t.description }}</td>
               <td>{{ capitalizeFirst(t.type) }}</td>
@@ -288,6 +318,9 @@ function capitalizeFirst(str: string) {
                   Delete
                 </button>
               </td>
+            </tr>
+            <tr v-if="!filteredTransactions.length">
+              <td colspan="7" style="text-align:center;">No transactions found.</td>
             </tr>
           </tbody>
         </table>
