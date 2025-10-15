@@ -97,11 +97,19 @@
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div v-for="room in rooms" :key="room.id" @click="selectRoom(room.id)"
-            :class="['transition-all border-2 rounded-xl p-4 flex flex-col items-center',
+          <div v-for="room in rooms" :key="room.id" @click="canSelectRoom(room) && selectRoom(room.id)"
+            :class="[
+              'relative transition-all border-2 rounded-xl p-4 flex flex-col items-center',
               selectedRoom === room.id ? 'border-green-700 bg-green-50' : 'border-neutral-200 bg-white',
-              room.availableRooms > 0 ? 'cursor-pointer hover:border-green-600' : 'cursor-not-allowed opacity-60',
-              roomsBlinking ? 'animate-pulse' : '']">
+              canSelectRoom(room) ? 'cursor-pointer hover:border-green-600' : 'cursor-not-allowed opacity-60',
+              roomsBlinking ? 'animate-pulse' : ''
+            ]"
+          >
+            <!-- Disallow badge -->
+            <div v-if="!canSelectRoom(room) && room.availableRooms > 0 && !isNaN(numericPax)"
+                 class="absolute top-2 right-2 text-[10px] font-semibold px-2 py-1 rounded bg-red-100 text-red-700 border border-red-200">
+              {{ paxDisallowText(room) }}
+            </div>
             <img :src="room.image" :alt="room.name" class="w-48 h-36 object-cover rounded-lg mb-3" />
             <div class="text-lg font-bold text-neutral-900">{{ room.name }}</div>
             <div :class="['text-sm font-medium', getAvailabilityDisplay(room).color]">
@@ -305,7 +313,11 @@ function selectRoom(id: number) {
     }
     return;
   }
-  
+  if (room && !isRoomAllowedByPax(room.category, numericPax.value)) {
+    // Show guidance alert based on pax
+    alert(`This room is for ${room.capacity}. Please adjust the number of pax or select a different room.`);
+    return;
+  }
   selectedRoom.value = id;
   // Hide room alert when a room is selected
   showRoomAlert.value = false;
@@ -403,6 +415,37 @@ function handleAuthAction() {
   } else {
     router.visit('/login');
   }
+}
+
+// Numeric pax computed property
+const numericPax = computed(() => {
+  const n = parseInt((form.value.pax || '').toString(), 10);
+  return isNaN(n) ? NaN : n;
+});
+
+// Determines if a room category is allowed by pax rules
+function isRoomAllowedByPax(category: string, pax: number): boolean {
+  if (isNaN(pax)) return true;
+  if (pax === 1) return category === 'individual';
+  if (pax >= 5 && pax <= 10) return category === 'master';
+  if (pax >= 3 && pax <= 4) return category === 'common';
+  return false;
+}
+
+// Used to enable/disable room selection
+function canSelectRoom(room: any): boolean {
+  return room.availableRooms > 0 && isRoomAllowedByPax(room.category, numericPax.value);
+}
+
+// Shows the "Not allowed for X pax" badge
+function paxDisallowText(room: any): string {
+  const p = numericPax.value;
+  if (isNaN(p)) return '';
+  if (p === 1 && room.category !== 'individual') return `Not allowed for ${p} pax`;
+  if (p >= 3 && p <= 4 && room.category !== 'common') return `Not allowed for ${p} pax`;
+  if (p >= 5 && p <= 10 && room.category !== 'master') return `Not allowed for ${p} pax`;
+  if (!(p === 1 || (p >= 3 && p <= 4) || (p >= 5 && p <= 10))) return `Not allowed for ${p} pax`;
+  return '';
 }
 </script>
 

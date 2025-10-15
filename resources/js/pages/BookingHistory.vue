@@ -185,20 +185,7 @@ const showLogoutModal = ref(false);
 const showCancelModal = ref(false);
 const bookingToCancel = ref<number | null>(null);
 
-// Format date for display (bookings now come pre-formatted from backend)
-function formatDate(dateString: string) {
-  // If already formatted, return as is
-  if (dateString.includes(',')) {
-    return dateString;
-  }
-  // Otherwise format it
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-}
+// (Removed unused formatDate function)
 
 // Get status styling class
 function getStatusClass(status: string) {
