@@ -162,5 +162,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 });
 
+// Serve the survey create page to match resources/js/pages/survey/Create.vue (requires auth)
+Route::get('/survey/create', function () {
+    return Inertia::render('Create');
+})->middleware(['auth', 'verified']);
+
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

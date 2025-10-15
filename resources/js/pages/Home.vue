@@ -127,6 +127,16 @@
         </div>
       </section>
       <!-- End Reviews Section -->
+
+      <!-- Floating Create Survey button -->
+      <button
+        class="create-survey-btn"
+        @click="createSurvey"
+        aria-label="Create a Survey"
+      >
+        <span class="plus">+</span>
+        <span class="label">Create a Survey!</span>
+      </button>
     </main>
 
     <!-- Logout Confirmation Modal -->
@@ -529,6 +539,39 @@ section > .testimonial-slide {
   background-color: #b91c1c !important;
   border-color: #b91c1c !important;
 }
+
+.create-survey-btn {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #495846;
+  color: #fff;
+  border: none;
+  padding: 0.6rem 0.9rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(73,88,70,0.18);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  z-index: 200;
+}
+.create-survey-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(73,88,70,0.22);
+}
+.create-survey-btn .plus {
+  background: rgba(255,255,255,0.12);
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.create-survey-btn .label {
+  font-size: 0.95rem;
+}
 </style>
 
 <script setup lang="ts">
@@ -684,6 +727,18 @@ function getCardStyle(idx: number) {
     ...base,
     opacity: 0,
     pointerEvents: 'none'
+  }
+}
+
+import { router } from '@inertiajs/vue3';
+
+function createSurvey() {
+  // If user is authenticated, go to survey create page.
+  // Otherwise redirect to login and include intended redirect so user returns after login.
+  if (user && user.value) {
+    router.visit('/survey/create');
+  } else {
+    router.visit('/login?redirect=/survey/create');
   }
 }
 </script>
