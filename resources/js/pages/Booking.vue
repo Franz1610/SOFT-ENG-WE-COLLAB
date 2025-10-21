@@ -75,7 +75,16 @@
               </div>
               <div class="flex-1">
                 <Label for="pax">No. of Pax</Label>
-                <Input id="pax" v-model="form.pax" type="number" min="1" required />
+                <Input 
+                  id="pax" 
+                  v-model="form.pax" 
+                  type="number" 
+                  min="1" 
+                  max="10"
+                  placeholder="1-10"
+                  @input="validatePax"
+                  required 
+                />
               </div>
             </div>
             <Button type="submit" class="w-full mt-4 bg-[#495846] hover:bg-[#38613a] text-white border-none">Submit</Button>
@@ -218,7 +227,7 @@ const rooms = ref([
     name: 'INDIV ROOM',
     image: '/images/booking/indiv_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '1 PAX ONLY',
+    capacity: '1-2 PAX ONLY',
     category: 'individual',
     totalRooms: 12,
     availableRooms: 0,
@@ -230,7 +239,7 @@ const rooms = ref([
     name: 'COMMON ROOM',
     image: '/images/booking/common_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '3-5 PAX ONLY',
+    capacity: '3-4 PAX ONLY',
     category: 'common',
     totalRooms: 5,
     availableRooms: 0,
@@ -333,6 +342,26 @@ function validateContactNumber(event: Event) {
   form.value.contact = target.value;
 }
 
+// Clamp pax input between 1 and 10
+function validatePax(event: Event) {
+  const target = event.target as HTMLInputElement;
+  let val = target.value.replace(/[^0-9]/g, '');
+  if (val === '') {
+    target.value = '';
+    form.value.pax = '';
+    return;
+  }
+  let n = parseInt(val, 10);
+  if (isNaN(n)) {
+    target.value = '';
+    form.value.pax = '';
+    return;
+  }
+  if (n < 1) n = 1;
+  if (n > 10) n = 10;
+  target.value = n.toString();
+  form.value.pax = target.value;
+}
 
 function submitBooking() {
   // Validate form data first
@@ -426,7 +455,7 @@ const numericPax = computed(() => {
 // Determines if a room category is allowed by pax rules
 function isRoomAllowedByPax(category: string, pax: number): boolean {
   if (isNaN(pax)) return true;
-  if (pax === 1) return category === 'individual';
+  if (pax >= 1 && pax <= 2) return category === 'individual';
   if (pax >= 5 && pax <= 10) return category === 'master';
   if (pax >= 3 && pax <= 4) return category === 'common';
   return false;
@@ -441,7 +470,7 @@ function canSelectRoom(room: any): boolean {
 function paxDisallowText(room: any): string {
   const p = numericPax.value;
   if (isNaN(p)) return '';
-  if (p === 1 && room.category !== 'individual') return `Not allowed for ${p} pax`;
+  if (p >= 1 && p <= 2 && room.category !== 'individual') return `Not allowed for ${p} pax`;
   if (p >= 3 && p <= 4 && room.category !== 'common') return `Not allowed for ${p} pax`;
   if (p >= 5 && p <= 10 && room.category !== 'master') return `Not allowed for ${p} pax`;
   if (!(p === 1 || (p >= 3 && p <= 4) || (p >= 5 && p <= 10))) return `Not allowed for ${p} pax`;

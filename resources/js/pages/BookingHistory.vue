@@ -74,12 +74,6 @@
             <div v-if="bookings.length === 0" class="p-8 text-center text-gray-500">
               <p class="text-lg">No booking history found</p>
               <p class="text-sm mt-2">Make your first booking to see it here!</p>
-              <Button 
-                @click="goToBooking"
-                class="mt-4 bg-[#495846] hover:bg-[#38613a] text-white border-none"
-              >
-                Make a Booking
-              </Button>
             </div>
           </div>
         </div>
