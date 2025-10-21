@@ -36,34 +36,34 @@
               <div>DATE</div>
               <div>CATEGORY</div>
               <div>TIME</div>
-              <div>STATUS</div>
+              <div class="text-center">STATUS</div>
             </div>
 
             <!-- Table Body -->
             <div class="divide-y divide-gray-300">
               <div 
-                v-for="booking in bookings" 
+                v-for="booking in paginatedBookings" 
                 :key="booking.id"
                 class="grid grid-cols-4 gap-4 p-4 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <div>{{ booking.date }}</div>
                 <div>{{ booking.category }}</div>
                 <div>{{ booking.time }}</div>
-                <div class="flex items-center justify-between">
+                <div class="status-cell">
                   <span 
                     :class="getStatusClass(booking.status)"
-                    class="px-2 py-1 rounded text-xs font-medium"
+                    class="status-badge"
                   >
                     {{ booking.status }}
                   </span>
                   <button
                     v-if="booking.can_cancel"
                     @click="cancelBooking(booking.id)"
-                    class="ml-3 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
+                    class="cancel-btn"
                   >
-                    Cancel Booking
+                    <span class="cancel-icon">&#128465;</span>
                   </button>
-                  <span v-else class="text-gray-400 text-xs">
+                  <span v-else class="text-gray-400 text-xs ml-2">
                     Cannot cancel
                   </span>
                 </div>
@@ -76,6 +76,21 @@
               <p class="text-sm mt-2">Make your first booking to see it here!</p>
             </div>
           </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div v-if="totalPages > 1" class="pagination-controls">
+          <button 
+            :disabled="currentPage === 1"
+            @click="currentPage--"
+            class="page-btn"
+          >Previous</button>
+          <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button 
+            :disabled="currentPage === totalPages"
+            @click="currentPage++"
+            class="page-btn"
+          >Next</button>
         </div>
 
         <div class="mt-6 flex justify-center">
@@ -174,12 +189,18 @@ const user = computed(() => page.props.auth.user);
 // Get bookings from props (passed from backend)
 const bookings = ref((page.props.bookings as any[]) || []);
 
+// Pagination state
+const currentPage = ref(1);
+const pageSize = 5;
+const totalPages = computed(() => Math.ceil(bookings.value.length / pageSize));
+const paginatedBookings = computed(() =>
+  bookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
+);
+
 // Modal state
 const showLogoutModal = ref(false);
 const showCancelModal = ref(false);
 const bookingToCancel = ref<number | null>(null);
-
-// (Removed unused formatDate function)
 
 // Get status styling class
 function getStatusClass(status: string) {
@@ -218,7 +239,6 @@ function confirmCancelBooking() {
           bookings.value[bookingIndex].status = 'Cancelled';
           bookings.value[bookingIndex].can_cancel = false;
         }
-        
         showCancelModal.value = false;
         bookingToCancel.value = null;
       },
@@ -262,10 +282,9 @@ function handleAuthAction() {
   }
 }
 
-// Load booking history on component mount
+// Reset to first page if bookings change
 onMounted(() => {
-  // In the future, this will fetch actual booking data from the backend
-  // based on the authenticated user's account
+  currentPage.value = 1;
 });
 </script>
 
@@ -364,36 +383,100 @@ main.main-content {
   border-color: #b91c1c !important;
 }
 
+.status-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  min-height: 38px;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  padding: 0.3em 0.8em;
+  font-size: 0.95em;
+  border-radius: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+.cancel-btn {
+  background: none;
+  border: none;
+  padding: 0.2em 0.5em;
+  margin-left: 0.2em;
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cancel-btn:hover .cancel-icon {
+  color: #dc2626;
+}
+.cancel-icon {
+  color: #495846;
+  font-size: 1.1em;
+  transition: color 0.2s;
+}
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.2em;
+  margin: 2em 0 0 0;
+}
+.page-btn {
+  background: #fff;
+  color: #495846;
+  border: 1px solid #495846;
+  border-radius: 6px;
+  padding: 0.3em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.page-btn:disabled {
+  background: #e0e0e0;
+  color: #888;
+  cursor: not-allowed;
+}
+.page-info {
+  font-size: 1em;
+  color: #495846;
+  font-weight: 500;
+}
 /* Responsive design */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
+  .main-content {
+    padding: 1em 0.5em;
+  }
   .grid-cols-4 {
     grid-template-columns: 1fr 1fr;
     gap: 2;
   }
-  
-  .grid-cols-4 > div:nth-child(3),
-  .grid-cols-4 > div:nth-child(4) {
-    grid-column: span 1;
+  .status-badge {
+    min-width: 60px;
+    font-size: 0.9em;
+    padding: 0.2em 0.5em;
   }
 }
-
-@media (max-width: 480px) {
-  .header-inner {
-    padding: 0.5rem 1rem;
+@media (max-width: 600px) {
+  .main-content {
+    padding: 0.5em 0.2em;
   }
-  
-  .nav {
-    gap: 0.5rem;
+  .status-cell {
+    flex-direction: column;
+    gap: 0.2em;
   }
-  
-  .nav-link {
-    font-size: 0.875rem;
-    padding: 0.25rem 0.5rem;
-  }
-  
-  .home-btn {
-    font-size: 0.875rem;
-    padding: 0.25rem 0.75rem;
+  .status-badge {
+    min-width: 48px;
+    font-size: 0.85em;
+    padding: 0.15em 0.3em;
   }
 }
 </style>
