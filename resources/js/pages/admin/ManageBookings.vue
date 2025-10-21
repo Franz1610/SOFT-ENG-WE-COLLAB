@@ -45,6 +45,14 @@ const breadcrumbs: BreadcrumbItem[] = [
 const page = usePage();
 const bookings = computed(() => page.props.bookings as Booking[]);
 
+// Pagination state
+const currentPage = ref(1);
+const pageSize = 10;
+const totalPages = computed(() => Math.ceil(bookings.value.length / pageSize));
+const paginatedBookings = computed(() =>
+    bookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
+);
+
 // Modal state
 const showCancelModal = ref(false);
 const showApproveModal = ref(false);
@@ -129,58 +137,32 @@ function formatDate(dateString: string) {
             </div>
 
             <div class="overflow-hidden rounded-lg border border-[#4b824b]">
-                <div v-if="bookings.length > 0" class="overflow-x-auto">
+                <div v-if="paginatedBookings.length > 0" class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-[#4b824b]">
                         <thead class="bg-[#4b824b]">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Booking ID
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    User
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Name
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Room
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Date
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Time
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">
-                                    Actions
-                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Booking ID</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">User</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Room</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Date</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Time</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="bg-[#FFFAE9] divide-y divide-[#4b824b]">
-                            <tr v-for="booking in bookings" :key="booking.id" class="hover:bg-[#f5f1e3]">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#4b824b]">
-                                    #{{ booking.id }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                            <tr v-for="booking in paginatedBookings" :key="booking.id" class="hover:bg-[#f5f1e3]">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-[#4b824b] text-left">#{{ booking.id }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-left">
                                     <div class="text-sm font-medium text-[#4b824b]">{{ booking.user.name }}</div>
                                     <div class="text-sm text-gray-600">{{ booking.user.email }}</div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-[#4b824b]">
-                                    {{ booking.company_name }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-[#4b824b]">
-                                    {{ booking.room_name }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-[#4b824b]">
-                                    {{ formatDate(booking.booking_date) }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-[#4b824b]">
-                                    {{ booking.formatted_time }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ booking.company_name }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ booking.room_name }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ formatDate(booking.booking_date) }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ booking.formatted_time }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-center">
                                     <span 
                                         class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
                                         :class="getStatusBadgeClass(booking.status)"
@@ -188,9 +170,8 @@ function formatDate(dateString: string) {
                                         {{ booking.status.charAt(0).toUpperCase() + booking.status.slice(1) }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <div class="flex gap-2">
-                                        <!-- Pending status buttons -->
+                                <td class="px-4 py-3 whitespace-nowrap text-center">
+                                    <div class="flex justify-center gap-2">
                                         <template v-if="booking.status === 'pending'">
                                             <Button
                                                 @click="openActionModal(booking, 'approve')"
@@ -208,8 +189,6 @@ function formatDate(dateString: string) {
                                                 Reject
                                             </Button>
                                         </template>
-                                        
-                                        <!-- Confirmed status buttons -->
                                         <template v-else-if="booking.status === 'confirmed'">
                                             <Button
                                                 @click="openActionModal(booking, 'cancel')"
@@ -220,8 +199,6 @@ function formatDate(dateString: string) {
                                                 Cancel
                                             </Button>
                                         </template>
-                                        
-                                        <!-- Already processed bookings -->
                                         <template v-else>
                                             <span class="text-gray-400 text-xs">
                                                 No actions available
@@ -237,6 +214,21 @@ function formatDate(dateString: string) {
                     <div class="text-gray-500 text-lg">No bookings found</div>
                     <div class="text-gray-400 text-sm mt-2">Bookings will appear here once users start making reservations</div>
                 </div>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div v-if="totalPages > 1" class="pagination-controls">
+                <button 
+                    :disabled="currentPage === 1"
+                    @click="currentPage--"
+                    class="page-btn"
+                >Previous</button>
+                <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+                <button 
+                    :disabled="currentPage === totalPages"
+                    @click="currentPage++"
+                    class="page-btn"
+                >Next</button>
             </div>
         </div>
 
@@ -392,5 +384,40 @@ function formatDate(dateString: string) {
 
 .divide-\[#4b824b\] > :not([hidden]) ~ :not([hidden]) {
     border-color: #4b824b;
+}
+
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.2em;
+    margin: 2em 0 0 0;
+}
+.page-btn {
+    background: #fff;
+    color: #495846;
+    border: 1px solid #495846;
+    border-radius: 6px;
+    padding: 0.3em 1.2em;
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.page-btn:disabled {
+    background: #e0e0e0;
+    color: #888;
+    cursor: not-allowed;
+}
+.page-info {
+    font-size: 1em;
+    color: #495846;
+    font-weight: 500;
+}
+th, td {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
 }
 </style>
