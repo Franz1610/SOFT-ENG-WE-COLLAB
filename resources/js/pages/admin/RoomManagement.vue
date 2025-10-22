@@ -41,11 +41,26 @@ const props = defineProps<Props>();
 // Reactive variables for modal
 const showIndividualRooms = ref(false);
 const showEditRooms = ref(false);
+const showAddRoomModal = ref(false);
+const showDeleteConfirmModal = ref(false);
+const showDeleteSuccessModal = ref(false);
+const showAddSuccessModal = ref(false);
 const selectedCategory = ref<RoomCategory | null>(null);
+const roomToDelete = ref<IndividualRoom | null>(null);
+const deletedRoomInfo = ref<{number: string, category: string} | null>(null);
+const addedRoomInfo = ref<{numberOfRooms: number, category: string} | null>(null);
 const individualRooms = ref<IndividualRoom[]>([]);
 const editableRooms = ref<IndividualRoom[]>([]);
 const loading = ref(false);
 const editLoading = ref(false);
+const addRoomLoading = ref(false);
+const deleteLoading = ref(false);
+
+// Add room form data
+const addRoomForm = ref({
+    category: '',
+    numberOfRooms: 1
+});
 
 // Use the room categories from props instead of mock data
 const roomCategories = computed(() => props.roomCategories);
@@ -148,8 +163,10 @@ const editRooms = async (category: RoomCategory) => {
     editLoading.value = true;
     
     try {
-        // Fetch real room data from backend
+        // Force fresh data fetch from backend
+        console.log('Fetching fresh room data for category:', category.category);
         editableRooms.value = await fetchIndividualRooms(category);
+        console.log('Fetched rooms:', editableRooms.value);
     } catch (error) {
         console.error('Error fetching rooms for edit:', error);
     } finally {
@@ -184,6 +201,107 @@ const toggleMaintenanceStatus = async (room: IndividualRoom) => {
         alert('Failed to update room status. Please try again.');
     }
 };
+
+// Add new room functions
+const openAddRoomModal = () => {
+    addRoomForm.value = {
+        category: roomCategories.value.length > 0 ? roomCategories.value[0].category : '',
+        numberOfRooms: 1
+    };
+    showAddRoomModal.value = true;
+};
+
+const submitAddRoom = async () => {
+    if (!addRoomForm.value.category || addRoomForm.value.numberOfRooms < 1) {
+        alert('Please fill in all fields correctly.');
+        return;
+    }
+
+    addRoomLoading.value = true;
+    
+    try {
+        await axios.post('/admin/rooms/add', {
+            category: addRoomForm.value.category,
+            numberOfRooms: addRoomForm.value.numberOfRooms
+        });
+        
+        // Store added room info for success modal
+        const categoryName = roomCategories.value.find(cat => cat.category === addRoomForm.value.category)?.name || addRoomForm.value.category;
+        addedRoomInfo.value = {
+            numberOfRooms: addRoomForm.value.numberOfRooms,
+            category: categoryName
+        };
+        
+        // Close modal and refresh data
+        showAddRoomModal.value = false;
+        router.reload({ only: ['roomCategories'] });
+        
+        // Show success modal
+        showAddSuccessModal.value = true;
+    } catch (error) {
+        console.error('Error adding rooms:', error);
+        alert('Failed to add rooms. Please try again.');
+    } finally {
+        addRoomLoading.value = false;
+    }
+};
+
+// Remove room functions
+const openDeleteConfirmModal = (room: IndividualRoom) => {
+    roomToDelete.value = room;
+    showDeleteConfirmModal.value = true;
+};
+
+const confirmDeleteRoom = async () => {
+    if (!roomToDelete.value) return;
+    
+    deleteLoading.value = true;
+    console.log('Attempting to delete room:', roomToDelete.value.number, 'in category:', selectedCategory.value?.category);
+    
+    try {
+        const response = await axios.delete(`/admin/rooms/delete`, {
+            data: {
+                category: selectedCategory.value?.category,
+                room_number: roomToDelete.value.number
+            }
+        });
+        
+        // Store deleted room info for success modal
+        deletedRoomInfo.value = {
+            number: roomToDelete.value.number,
+            category: selectedCategory.value?.name || ''
+        };
+        
+        // Close the delete modal
+        showDeleteConfirmModal.value = false;
+        
+        // Refresh the room data in the edit modal
+        editableRooms.value = await fetchIndividualRooms(selectedCategory.value!);
+        
+        // Refresh the page data to update category stats
+        router.reload({ only: ['roomCategories'] });
+        
+        // Show success modal
+        showDeleteSuccessModal.value = true;
+    } catch (error: any) {
+        console.error('Error deleting room:', error);
+        
+        // Show more specific error message
+        let errorMessage = 'Failed to delete room. Please try again.';
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response?.status === 404) {
+            errorMessage = 'Room not found.';
+        } else if (error.response?.status === 400) {
+            errorMessage = 'Cannot delete room with active bookings.';
+        }
+        
+        alert(errorMessage);
+    } finally {
+        deleteLoading.value = false;
+        roomToDelete.value = null;
+    }
+};
 </script>
 
 <template>
@@ -206,7 +324,7 @@ const toggleMaintenanceStatus = async (room: IndividualRoom) => {
                             <RefreshCw class="w-4 h-4 mr-2" />
                             Refresh
                         </Button>
-                        <Button class="bg-[#4b824b] hover:bg-[#3d6b3d] text-[#FFFAE9] border-[#4b824b]">
+                        <Button class="bg-[#4b824b] hover:bg-[#3d6b3d] text-[#FFFAE9] border-[#4b824b]" @click="openAddRoomModal">
                             <Building class="w-4 h-4 mr-2" />
                             Add New Room
                         </Button>
@@ -444,8 +562,9 @@ const toggleMaintenanceStatus = async (room: IndividualRoom) => {
                                     {{ room.timeRange }}
                                 </div>
                                 
-                                <!-- Maintenance Toggle Button -->
-                                <div class="pt-2">
+                                <!-- Action Buttons -->
+                                <div class="pt-2 space-y-2">
+                                    <!-- Maintenance Toggle Button -->
                                     <Button 
                                         v-if="room.status !== 'Occupied'"
                                         @click="toggleMaintenanceStatus(room)"
@@ -458,12 +577,250 @@ const toggleMaintenanceStatus = async (room: IndividualRoom) => {
                                     >
                                         {{ room.status === 'Maintenance' ? 'Remove from Maintenance' : 'Set to Maintenance' }}
                                     </Button>
-                                    <div v-else class="text-xs text-gray-500 text-center py-2">
+                                    
+                                    <!-- Remove Room Button -->
+                                    <Button 
+                                        v-if="room.status !== 'Occupied'"
+                                        @click="openDeleteConfirmModal(room)"
+                                        variant="outline"
+                                        class="w-full border-red-500 text-red-600 hover:bg-red-500 hover:text-white"
+                                        size="sm"
+                                    >
+                                        Remove Room
+                                    </Button>
+                                    
+                                    <div v-if="room.status === 'Occupied'" class="text-xs text-gray-500 text-center py-2">
                                         Cannot modify occupied room
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Add New Room Modal -->
+        <Dialog v-model:open="showAddRoomModal">
+            <DialogContent class="max-w-md bg-[#FFFAE9] border-2 border-[#4b824b]">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-[#4b824b]">
+                        <Building class="w-5 h-5 inline mr-2" />
+                        Add New Room
+                    </DialogTitle>
+                    <DialogDescription class="text-[#344C34]">
+                        Add new rooms to an existing category
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="space-y-4 mt-4">
+                    <!-- Room Category Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-2">
+                            Room Category
+                        </label>
+                        <select 
+                            v-model="addRoomForm.category" 
+                            class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b] focus:ring-2 focus:ring-[#4b824b] focus:border-transparent"
+                        >
+                            <option value="" disabled>Select a category</option>
+                            <option v-for="category in roomCategories" :key="category.id" :value="category.category">
+                                {{ category.name }}
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <!-- Number of Rooms -->
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-2">
+                            Number of Rooms to Add
+                        </label>
+                        <input 
+                            v-model.number="addRoomForm.numberOfRooms" 
+                            type="number" 
+                            min="1" 
+                            max="50"
+                            class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b] focus:ring-2 focus:ring-[#4b824b] focus:border-transparent"
+                            placeholder="Enter number of rooms"
+                        />
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2 justify-end mt-6">
+                        <Button 
+                            variant="outline" 
+                            class="border-[#4b824b] text-[#4b824b] hover:bg-[#4b824b] hover:text-[#FFFAE9]"
+                            @click="showAddRoomModal = false"
+                            :disabled="addRoomLoading"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            class="bg-[#4b824b] hover:bg-[#3d6b3d] text-[#FFFAE9]"
+                            @click="submitAddRoom"
+                            :disabled="addRoomLoading || !addRoomForm.category || addRoomForm.numberOfRooms < 1"
+                        >
+                            <Building class="w-4 h-4 mr-2" v-if="!addRoomLoading" />
+                            <div class="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" v-else></div>
+                            {{ addRoomLoading ? 'Adding...' : 'Add Rooms' }}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Delete Confirmation Modal -->
+        <Dialog v-model:open="showDeleteConfirmModal">
+            <DialogContent class="max-w-md bg-[#FFFAE9] border-2 border-red-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-red-600 flex items-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete Room
+                    </DialogTitle>
+                    <DialogDescription class="text-[#344C34] mt-2">
+                        This action cannot be undone. The room will be permanently removed from the system.
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            <span class="text-red-700 font-medium">Warning</span>
+                        </div>
+                        <p class="text-red-600 mt-2">
+                            You are about to permanently delete 
+                            <span class="font-semibold">{{ roomToDelete?.number }}</span> 
+                            from the {{ selectedCategory?.name }} category.
+                        </p>
+                    </div>
+                    
+                    <div v-if="roomToDelete" class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                        <h4 class="font-medium text-[#4b824b] mb-2">Room Details:</h4>
+                        <div class="space-y-1 text-sm text-[#344C34]">
+                            <div class="flex justify-between">
+                                <span>Room Number:</span>
+                                <span class="font-medium">{{ roomToDelete.number }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Category:</span>
+                                <span class="font-medium">{{ selectedCategory?.name }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Status:</span>
+                                <span :class="getStatusBadgeClass(roomToDelete.status)" 
+                                      class="px-2 py-1 rounded-full text-xs font-medium">
+                                    {{ roomToDelete.status }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Capacity:</span>
+                                <span class="font-medium">{{ roomToDelete.capacity }} people</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 justify-end mt-6">
+                        <Button 
+                            variant="outline" 
+                            class="border-gray-300 text-gray-700 hover:bg-gray-50"
+                            @click="showDeleteConfirmModal = false"
+                            :disabled="deleteLoading"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            class="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            @click="confirmDeleteRoom"
+                            :disabled="deleteLoading"
+                        >
+                            <svg class="w-4 h-4 mr-2" v-if="!deleteLoading" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            <div class="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" v-else></div>
+                            {{ deleteLoading ? 'Deleting...' : 'Delete Room' }}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Delete Success Modal -->
+        <Dialog v-model:open="showDeleteSuccessModal">
+            <DialogContent class="max-w-sm bg-[#FFFAE9] border-2 border-green-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-green-600 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Room Successfully Deleted
+                    </DialogTitle>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-green-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <p class="text-green-700 font-medium">
+                                {{ deletedRoomInfo?.number }} has been successfully deleted.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex justify-center mt-6">
+                        <Button 
+                            class="bg-green-600 hover:bg-green-700 text-white border-green-600 px-6"
+                            @click="showDeleteSuccessModal = false"
+                        >
+                            OK
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Add Room Success Modal -->
+        <Dialog v-model:open="showAddSuccessModal">
+            <DialogContent class="max-w-sm bg-[#FFFAE9] border-2 border-green-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-green-600 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        {{ addedRoomInfo?.numberOfRooms === 1 ? 'Room' : 'Rooms' }} Successfully Added
+                    </DialogTitle>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-green-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <p class="text-green-700 font-medium">
+                                {{ addedRoomInfo?.numberOfRooms }} 
+                                {{ addedRoomInfo?.numberOfRooms === 1 ? 'room has' : 'rooms have' }} 
+                                been successfully added to {{ addedRoomInfo?.category }}.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex justify-center mt-6">
+                        <Button 
+                            class="bg-green-600 hover:bg-green-700 text-white border-green-600 px-6"
+                            @click="showAddSuccessModal = false"
+                        >
+                            OK
+                        </Button>
                     </div>
                 </div>
             </DialogContent>

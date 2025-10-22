@@ -12,9 +12,9 @@
             {{ user ? 'Log out' : 'Log in' }}
           </a>
           <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="#" class="nav-link">What's NEW?</a>
-            <Link href="/booking" class="nav-link">Booking</Link>
-          <button class="home-btn">HOME</button>
+          <Link href="/whats-new" class="nav-link">What's NEW?</Link>
+          <Link href="/booking" class="nav-link">Booking</Link>
+          <span class="nav-link active">HOME</span>
         </nav>
       </div>
     </header>
@@ -240,6 +240,11 @@ html, body, #app, .main-content {
 .nav-link:hover {
   background: #fff;
   color: #495846;
+}
+.nav-link.active {
+  background: #fff;
+  color: #495846;
+  font-weight: 600;
 }
 .logout-link:hover {
   background: #dc2626 !important;

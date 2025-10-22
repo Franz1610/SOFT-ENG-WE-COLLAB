@@ -11,6 +11,11 @@ Route::get('/', function () {
     return Inertia::render('Home');
 })->name('home');
 
+// What's NEW page (accessible to everyone - both logged in and guest users)
+Route::get('/whats-new', function () {
+    return Inertia::render('WhatsNew');
+})->name('whats-new');
+
 // Public API for room availability (accessible without auth)
 Route::get('/api/room-availability', [\App\Http\Controllers\RoomManagementController::class, 'getRoomCategories']);
 
@@ -108,6 +113,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/rooms', [\App\Http\Controllers\RoomManagementController::class, 'index']);
         Route::get('/admin/rooms/{category}', [\App\Http\Controllers\RoomManagementController::class, 'getRoomData']);
         Route::post('/admin/rooms/maintenance', [\App\Http\Controllers\RoomManagementController::class, 'updateMaintenanceStatus']);
+        Route::post('/admin/rooms/add', [\App\Http\Controllers\RoomManagementController::class, 'addRooms']);
+        Route::delete('/admin/rooms/delete', [\App\Http\Controllers\RoomManagementController::class, 'deleteRoom']);
         
         // Booking management - both admin and admin officer
         Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);

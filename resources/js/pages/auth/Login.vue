@@ -12,9 +12,9 @@ function goHome() {
       <div class="header-inner">
         <div class="logo">WECOLLAB</div>
         <nav class="nav">
-          <a href="login" class="nav-link">Log in</a>
+          <span class="nav-link active">Log in</span>
           <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="#" class="nav-link">What's NEW?</a>
+          <a href="/whats-new" class="nav-link">What's NEW?</a>
           <a href="#" class="nav-link">Booking</a>
           <button class="home-btn" @click="goHome">HOME</button>
         </nav>
@@ -96,21 +96,26 @@ function goHome() {
   background: #fff;
   color: #495846;
 }
-.home-btn {
+.nav-link.active {
   background: #fff;
   color: #495846;
+  font-weight: 600;
+}
+.home-btn {
+  background: transparent;
+  color: #fff;
   border: none;
   border-radius: 6px;
   padding: 0.3rem 1rem;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 400;
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
   margin-left: 0.5rem;
   line-height: 1.2;
 }
 .home-btn:hover {
-  background: #e0e0e0;
+  background: #fff;
   color: #495846;
 }
 main.main-content {

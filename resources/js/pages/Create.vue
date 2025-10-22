@@ -13,7 +13,7 @@
             {{ user ? 'Log out' : 'Log in' }}
           </a>
           <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="#" class="nav-link">What's NEW?</a>
+          <a href="/whats-new" class="nav-link">What's NEW?</a>
           <Link href="/booking" class="nav-link">Booking</Link>
           <button class="home-btn" @click="goHome">HOME</button>
         </nav>

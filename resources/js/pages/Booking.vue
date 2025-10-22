@@ -13,9 +13,9 @@
             {{ user ? 'Log out' : 'Log in' }}
           </a>
           <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="#" class="nav-link">What's NEW?</a>
-          <a href="#" class="nav-link">Booking</a>
-          <button class="home-btn" @click="goHome">HOME</button>
+          <a href="/whats-new" class="nav-link">What's NEW?</a>
+          <span class="nav-link active">Booking</span>
+          <Link href="/" class="nav-link">HOME</Link>
         </nav>
       </div>
     </header>
@@ -522,6 +522,11 @@ function paxDisallowText(room: any): string {
 .nav-link:hover {
   background: #fff;
   color: #495846;
+}
+.nav-link.active {
+  background: #fff;
+  color: #495846;
+  font-weight: 600;
 }
 .logout-link:hover {
   background: #dc2626 !important;
