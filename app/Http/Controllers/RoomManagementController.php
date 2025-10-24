@@ -240,19 +240,35 @@ class RoomManagementController extends Controller
             'status' => 'required|in:Available,Maintenance'
         ]);
 
+        $category = $validated['category'];
+        $roomNumber = $validated['room_number'];
+        
+        // Map frontend room number (Room 1, Room 2) to actual database room number (IND-01, COM-01, etc)
+        $actualRoomNumber = $this->mapFrontendToActualRoomNumber($category, $roomNumber);
+        
+        \Log::info("Frontend requested maintenance update for: {$roomNumber} in category: {$category}");
+        \Log::info("Mapped to actual room number: {$actualRoomNumber}");
+
         // Convert the frontend status to database status
         $dbStatus = $validated['status'] === 'Maintenance' ? 'maintenance' : 'available';
 
-        // Update or create room record
-        Room::updateOrCreate(
-            [
-                'category' => $validated['category'],
-                'room_number' => $validated['room_number']
-            ],
-            [
-                'status' => $dbStatus
-            ]
-        );
+        // Find the specific room - don't create if it doesn't exist
+        $room = Room::where('category', $category)
+            ->where('room_number', $actualRoomNumber)
+            ->first();
+
+        if (!$room) {
+            \Log::error("Room not found: {$actualRoomNumber} in category: {$category}");
+            return response()->json([
+                'success' => false,
+                'message' => "Room not found: {$actualRoomNumber}"
+            ], 404);
+        }
+
+        // Update the room status
+        $room->update(['status' => $dbStatus]);
+        
+        \Log::info("Successfully updated room {$actualRoomNumber} status to {$dbStatus}");
 
         return response()->json(['success' => true]);
     }

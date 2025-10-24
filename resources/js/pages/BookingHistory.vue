@@ -56,14 +56,15 @@
                   >
                     {{ booking.status }}
                   </span>
-                  <button
+                  <button 
                     v-if="booking.can_cancel"
-                    @click="cancelBooking(booking.id)"
+                    @click="cancelBooking(booking.id)" 
                     class="cancel-btn"
+                    title="Cancel Booking"
                   >
-                    <span class="cancel-icon">&#128465;</span>
+                    Cancel
                   </button>
-                  <span v-else class="text-gray-400 text-xs ml-2">
+                  <span v-else class="cannot-cancel-text">
                     Cannot cancel
                   </span>
                 </div>
@@ -244,7 +245,7 @@ function confirmCancelBooking() {
       },
       onError: (error) => {
         console.error('Cancel error:', error);
-        alert('There was an error cancelling the booking. Please try again.');
+        alert('❌ Unable to cancel booking. This booking may no longer be eligible for cancellation or there was a network error. Please refresh the page and try again.');
         showCancelModal.value = false;
         bookingToCancel.value = null;
       }
@@ -408,25 +409,39 @@ main.main-content {
   text-align: center;
 }
 .cancel-btn {
-  background: none;
-  border: none;
-  padding: 0.2em 0.5em;
-  margin-left: 0.2em;
-  font-size: 1em;
+  background: #fff1f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.25em 0.75em;
+  margin-left: 0.5rem;
+  font-size: 0.8em;
+  font-weight: 500;
   cursor: pointer;
   border-radius: 6px;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 50px;
+  height: 26px;
 }
-.cancel-btn:hover .cancel-icon {
-  color: #dc2626;
+.cancel-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2);
 }
-.cancel-icon {
-  color: #495846;
-  font-size: 1.1em;
-  transition: color 0.2s;
+.cannot-cancel-text {
+  color: #9ca3af;
+  font-size: 0.8em;
+  font-weight: 500;
+  margin-left: 0.5rem;
+  padding: 0.25em 0.75em;
+  height: 26px;
+  min-width: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .pagination-controls {
   display: flex;

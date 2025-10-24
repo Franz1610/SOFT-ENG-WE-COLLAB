@@ -14,8 +14,8 @@ class RoomSeeder extends Seeder
     {
         $plan = [
             'individual' => 12, // INDIV ROOM: 12
-            'common'     => 5,  // COMMON ROOM: 5
-            'master'     => 3,  // MASTER ROOM: 3
+            'master'     => 5,  // MASTER ROOM: 5
+            'common'     => 3,  // COMMON ROOM: 3
         ];
 
         $now = now();

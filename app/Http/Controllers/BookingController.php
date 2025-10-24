@@ -61,7 +61,7 @@ class BookingController extends Controller
                     'category' => ucfirst($booking->category) . ' room',
                     'time' => $booking->formatted_time,
                     'status' => $this->mapStatus($booking->status),
-                    'can_cancel' => in_array($booking->status, ['confirmed', 'pending']) && $booking->booking_date >= now()->toDateString(),
+                    'can_cancel' => $booking->status === 'pending' && $booking->booking_date >= now()->toDateString(),
                 ];
             });
 
@@ -72,7 +72,7 @@ class BookingController extends Controller
     {
         $booking = Booking::where('id', $id)
             ->where('user_id', auth()->id())
-            ->whereIn('status', ['confirmed', 'pending'])
+            ->where('status', 'pending')
             ->where('booking_date', '>=', now()->toDateString())
             ->first();
 
@@ -93,12 +93,12 @@ class BookingController extends Controller
             ->first();
 
         if (!$booking) {
-            return redirect('/admin/bookings')->with('error', 'Booking not found or already processed');
+            return back()->with('error', 'Booking not found or already processed');
         }
 
         $booking->update(['status' => 'confirmed']);
 
-        return redirect('/admin/bookings')->with('success', 'Booking approved successfully');
+        return back()->with('success', 'Booking approved successfully');
     }
 
     public function reject($id)
@@ -108,12 +108,12 @@ class BookingController extends Controller
             ->first();
 
         if (!$booking) {
-            return redirect('/admin/bookings')->with('error', 'Booking not found or already processed');
+            return back()->with('error', 'Booking not found or already processed');
         }
 
         $booking->update(['status' => 'rejected']);
 
-        return redirect('/admin/bookings')->with('success', 'Booking rejected successfully');
+        return back()->with('success', 'Booking rejected successfully');
     }
 
     public function adminCancel($id)
@@ -123,12 +123,12 @@ class BookingController extends Controller
             ->first();
 
         if (!$booking) {
-            return redirect('/admin/bookings')->with('error', 'Booking not found or cannot be cancelled');
+            return back()->with('error', 'Booking not found or cannot be cancelled');
         }
 
         $booking->update(['status' => 'cancelled']);
 
-        return redirect('/admin/bookings')->with('success', 'Booking cancelled successfully');
+        return back()->with('success', 'Booking cancelled successfully');
     }
 
     private function convertTimeFormat($timeString)
