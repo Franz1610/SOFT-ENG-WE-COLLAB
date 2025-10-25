@@ -45,7 +45,8 @@
             <input type="checkbox" name="remember" id="remember" class="mr-2" />
             <label for="remember" class="text-sm">Remember me</label>
           </div>
-          <button type="submit" class="w-full py-2 rounded bg-black text-white font-semibold text-base hover:bg-neutral-800 transition" :disabled="processing">Sign up</button>
+          <button type="submit" class="w-full py-2 rounded bg-black text-white font-semibold text-base hover:bg-neutral-800 transition"
+            :disabled="processing">Sign up</button>
         </Form>
         <div class="mt-3 text-center text-black text-sm">
           Already have an account? <a href="/login" class="text-blue-700 hover:underline">Sign in now!</a>
@@ -56,10 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { Form, useForm } from '@inertiajs/vue3';
-
-// ...existing code...
-
+import { Form } from '@inertiajs/vue3';
 function goHome() {
   window.location.href = '/';
 }

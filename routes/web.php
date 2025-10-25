@@ -38,9 +38,6 @@ Route::get('/booking/schedule', function () {
 })->middleware(['auth', 'verified']);
 
 Route::post('/booking/schedule', function (\Illuminate\Http\Request $request) {
-    // Store booking form data in session
-    $bookingData = $request->all();
-    $request->session()->put('booking_data', $bookingData);
     return Inertia::render('BookingSchedule', $bookingData);
 })->middleware(['auth', 'verified']);
 
@@ -191,3 +188,4 @@ Route::middleware(['auth'])->group(function () {
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
+
