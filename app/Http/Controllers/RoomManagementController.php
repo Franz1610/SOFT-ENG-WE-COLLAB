@@ -42,10 +42,13 @@ class RoomManagementController extends Controller
         // Debug: Log what we're looking for
         \Log::info("Looking for bookings with category: {$category}, date: {$today}");
         
-        // Get confirmed bookings for today for this category
+        // Get confirmed bookings for today for this category that are currently active
+        $currentTime = $now->toTimeString();
         $confirmedBookings = Booking::where('category', $category)
             ->whereDate('booking_date', $today)
             ->where('status', 'confirmed')
+            ->where('start_time', '<=', $currentTime)
+            ->where('end_time', '>', $currentTime)
             ->get();
 
         // Debug: Log what we found
@@ -53,6 +56,13 @@ class RoomManagementController extends Controller
         foreach ($confirmedBookings as $booking) {
             \Log::info("Booking ID: {$booking->id}, Room ID: {$booking->room_id}, Category: {$booking->category}, Status: {$booking->status}, Date: {$booking->booking_date}");
         }
+
+        // Also get upcoming bookings for today (confirmed but not yet started)
+        $upcomingBookings = Booking::where('category', $category)
+            ->whereDate('booking_date', $today)
+            ->where('status', 'confirmed')
+            ->where('start_time', '>', $currentTime)
+            ->get();
 
         // Get total number of rooms for this category
         $totalRooms = $this->getTotalRoomsByCategory($category);
@@ -62,9 +72,10 @@ class RoomManagementController extends Controller
             ->where('status', 'maintenance')
             ->get();
         
-        // Create room data with occupied/available/maintenance status
+        // Create room data with occupied/available/maintenance/reserved status
         $rooms = [];
-        $bookingIndex = 0; // Track which booking to assign to which room
+        $occupiedBookingIndex = 0; // Track which occupied booking to assign to which room
+        $upcomingBookingIndex = 0; // Track which upcoming booking to assign to which room
         
         for ($i = 1; $i <= $totalRooms; $i++) {
             $roomNumber = "Room {$i}";
@@ -84,10 +95,10 @@ class RoomManagementController extends Controller
                     'timeRange' => null,
                     'booking_id' => null
                 ];
-            } elseif ($bookingIndex < $confirmedBookings->count()) {
-                // Assign bookings to non-maintenance rooms
-                $booking = $confirmedBookings[$bookingIndex];
-                \Log::info("Room {$i} is occupied by booking ID: {$booking->id}");
+            } elseif ($occupiedBookingIndex < $confirmedBookings->count()) {
+                // Assign currently active bookings to non-maintenance rooms
+                $booking = $confirmedBookings[$occupiedBookingIndex];
+                \Log::info("Room {$i} is currently occupied by booking ID: {$booking->id}");
                 $rooms[] = [
                     'number' => $roomNumber,
                     'status' => 'Occupied',
@@ -96,7 +107,20 @@ class RoomManagementController extends Controller
                     'timeRange' => $this->formatTimeRange($booking->start_time, $booking->end_time),
                     'booking_id' => $booking->id
                 ];
-                $bookingIndex++;
+                $occupiedBookingIndex++;
+            } elseif ($upcomingBookingIndex < $upcomingBookings->count()) {
+                // Assign upcoming bookings to show as "Reserved"
+                $booking = $upcomingBookings[$upcomingBookingIndex];
+                \Log::info("Room {$i} is reserved for upcoming booking ID: {$booking->id}");
+                $rooms[] = [
+                    'number' => $roomNumber,
+                    'status' => 'Reserved',
+                    'capacity' => $booking->pax,
+                    'guest' => $booking->first_name . ' ' . $booking->last_name,
+                    'timeRange' => $this->formatTimeRange($booking->start_time, $booking->end_time),
+                    'booking_id' => $booking->id
+                ];
+                $upcomingBookingIndex++;
             } else {
                 $rooms[] = [
                     'number' => $roomNumber,
@@ -165,7 +189,24 @@ class RoomManagementController extends Controller
             $totalRoomsCount = Room::where('category', $key)->count();
             $category['totalRooms'] = $totalRoomsCount;
 
-            $confirmedBookings = Booking::where('category', $key)
+            // Count bookings that are currently active (within their time range)
+            $currentlyOccupiedBookings = Booking::where('category', $key)
+                ->whereDate('booking_date', $today)
+                ->where('status', 'confirmed')
+                ->where('start_time', '<=', $currentTime)
+                ->where('end_time', '>', $currentTime)
+                ->count();
+
+            // Count upcoming bookings (confirmed but not yet started)
+            $reservedBookings = Booking::where('category', $key)
+                ->whereDate('booking_date', $today)
+                ->where('status', 'confirmed')
+                ->where('start_time', '>', $currentTime)
+                ->count();
+
+            // Count ALL confirmed bookings for today (both current and future) for availability calculation
+            // This is because users can't book a room that already has any confirmed booking for today
+            $allConfirmedBookingsToday = Booking::where('category', $key)
                 ->whereDate('booking_date', $today)
                 ->where('status', 'confirmed')
                 ->count();
@@ -174,8 +215,12 @@ class RoomManagementController extends Controller
                 ->where('status', 'maintenance')
                 ->count();
 
-            $category['availableRooms'] = $category['totalRooms'] - $confirmedBookings - $maintenanceRoomsCount;
-            $category['occupiedRooms'] = $confirmedBookings;
+            // Available rooms should exclude ALL rooms with confirmed bookings today (not just currently occupied)
+            $category['availableRooms'] = $category['totalRooms'] - $allConfirmedBookingsToday - $maintenanceRoomsCount;
+            // But occupied rooms only shows currently active bookings
+            $category['occupiedRooms'] = $currentlyOccupiedBookings;
+            // Reserved rooms shows upcoming bookings
+            $category['reservedRooms'] = $reservedBookings;
             $category['maintenanceRooms'] = $maintenanceRoomsCount;
         }
 

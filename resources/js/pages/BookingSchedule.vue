@@ -207,11 +207,80 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- One Hour Advance Warning Modal -->
+    <Dialog :open="showOneHourWarningModal" @update:open="closeOneHourWarningModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #dc2626;">
+            ⚠️ Advance Booking Required
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            To avoid rush bookings, all reservations must be made at least 1 hour in advance.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div class="py-4 px-4 rounded-lg border mx-6" style="background: #fef2f2; border-color: #dc2626;">
+          <div class="space-y-2 text-center">
+            <div class="font-medium" style="color: #dc2626;">Current Time:</div>
+            <div class="font-semibold text-lg" style="color: #dc2626;">{{ currentTimeDisplay }}</div>
+            <div class="font-medium mt-3" style="color: #dc2626;">Earliest Booking Time:</div>
+            <div class="font-semibold text-lg" style="color: #dc2626;">{{ minimumTimeDisplay }}</div>
+          </div>
+        </div>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            @click="closeOneHourWarningModal"
+            class="flex-1 text-white border-none"
+            style="background-color: #dc2626; border-color: #dc2626;"
+          >
+            I Understand
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Past Time Warning Modal -->
+    <Dialog :open="showPastTimeWarningModal" @update:open="closePastTimeWarningModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #dc2626;">
+            ⏰ Past Time Selected
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            You cannot book a time that has already passed. Please select a future time.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div class="py-4 px-4 rounded-lg border mx-6" style="background: #fef2f2; border-color: #dc2626;">
+          <div class="space-y-2 text-center">
+            <div class="font-medium" style="color: #dc2626;">Current Time:</div>
+            <div class="font-semibold text-lg" style="color: #dc2626;">{{ currentTimeDisplay }}</div>
+            <div class="font-medium mt-3" style="color: #dc2626;">Earliest Available Time:</div>
+            <div class="font-semibold text-lg" style="color: #dc2626;">{{ minimumTimeDisplay }}</div>
+            <div class="text-sm mt-2" style="color: #dc2626;">
+              (Bookings must be at least 1 hour in advance)
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            @click="closePastTimeWarningModal"
+            class="flex-1 text-white border-none"
+            style="background-color: #dc2626; border-color: #dc2626;"
+          >
+            Choose Different Time
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -246,7 +315,65 @@ const form = ref({
 // Modal state
 const showConfirmationModal = ref(false);
 const showLogoutModal = ref(false);
+const showOneHourWarningModal = ref(false);
+const showPastTimeWarningModal = ref(false);
 const isValidating = ref(false);
+
+// Reactive time display properties that auto-update
+const currentTimeDisplay = ref('');
+const minimumTimeDisplay = ref('');
+let timeUpdateInterval: number | null = null;
+
+// Function to update time displays
+function updateTimeDisplays() {
+  const now = new Date();
+  
+  // Update current time display
+  const manilaTimeString12h = now.toLocaleString("en-US", {
+    timeZone: "Asia/Manila",
+    hour12: true,
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+  currentTimeDisplay.value = manilaTimeString12h;
+  
+  // Update minimum time display
+  const manilaTimeString24h = now.toLocaleString("en-US", {
+    timeZone: "Asia/Manila",
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  const [currentHour, currentMinute] = manilaTimeString24h.split(':').map(Number);
+  const minimumMinutes = (currentHour * 60 + currentMinute) + 60; // Add 1 hour
+  const minimumHour = Math.floor(minimumMinutes / 60) % 24;
+  const minimumMin = minimumMinutes % 60;
+  
+  // Convert to 12-hour format
+  let displayHour = minimumHour;
+  const period = minimumHour >= 12 ? 'PM' : 'AM';
+  if (displayHour === 0) displayHour = 12;
+  else if (displayHour > 12) displayHour = displayHour - 12;
+  
+  minimumTimeDisplay.value = `${displayHour}:${minimumMin.toString().padStart(2, '0')} ${period}`;
+}
+
+// Setup auto-refresh when component mounts
+onMounted(() => {
+  // Initial update
+  updateTimeDisplays();
+  
+  // Update every second (1000ms)
+  timeUpdateInterval = setInterval(updateTimeDisplays, 1000);
+});
+
+// Cleanup interval when component unmounts
+onUnmounted(() => {
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval);
+    timeUpdateInterval = null;
+  }
+});
 
 // Set minimum date to today in Asia/Manila timezone
 const minDate = computed(() => {
@@ -272,7 +399,7 @@ function convertTo24Hour(hour: string, period: string): number {
   return hour24;
 }
 
-// Validate time for today's bookings
+// Validate time for today's bookings - requires 1 hour advance booking (no alerts, just returns boolean)
 function validateTimeForToday() {
   if (!form.value.date || isValidating.value) return true;
   
@@ -301,17 +428,17 @@ function validateTimeForToday() {
     });
     const [currentHour, currentMinute] = manilaTimeString.split(':').map(Number);
     
+    // Calculate minimum booking time (current time + 1 hour)
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const minimumBookingMinutes = currentTotalMinutes + 60; // Add 1 hour (60 minutes)
+    
     // Validate start time
     if (form.value.startTime.hour && form.value.startTime.minute && form.value.startTime.period) {
       const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
       const startMinute = parseInt(form.value.startTime.minute);
+      const startTotalMinutes = startHour24 * 60 + startMinute;
       
-      if (startHour24 < currentHour || (startHour24 === currentHour && startMinute <= currentMinute)) {
-        isValidating.value = true;
-        alert('Cannot select past time for today. Please choose a future time.');
-        setTimeout(() => {
-          isValidating.value = false;
-        }, 100);
+      if (startTotalMinutes < minimumBookingMinutes) {
         return false;
       }
     }
@@ -320,13 +447,9 @@ function validateTimeForToday() {
     if (form.value.endTime.hour && form.value.endTime.minute && form.value.endTime.period) {
       const endHour24 = convertTo24Hour(form.value.endTime.hour, form.value.endTime.period);
       const endMinute = parseInt(form.value.endTime.minute);
+      const endTotalMinutes = endHour24 * 60 + endMinute;
       
-      if (endHour24 < currentHour || (endHour24 === currentHour && endMinute <= currentMinute)) {
-        isValidating.value = true;
-        alert('Cannot select past time for today. Please choose a future time.');
-        setTimeout(() => {
-          isValidating.value = false;
-        }, 100);
+      if (endTotalMinutes < minimumBookingMinutes) {
         return false;
       }
     }
@@ -422,13 +545,14 @@ function submitSchedule() {
   console.log('Selected date:', selectedDateString);
   
   if (selectedDateString < manilaDateString) {
-    alert('Cannot book for past dates. Please select today or a future date.');
+    console.log('BLOCKING: Selected date is in the past');
+    showPastTimeWarningModal.value = true;
     return;
   }
   
-  // Check if selected time is in the past (only for today)
+  // Check if selected time meets 1-hour advance requirement (only for today)
   if (selectedDateString === manilaDateString) {
-    console.log('=== TIME VALIDATION FOR TODAY ===');
+    console.log('=== TIME VALIDATION FOR TODAY - 1 HOUR ADVANCE ===');
     console.log('Original browser time:', now.toLocaleString());
     console.log('Manila date:', manilaDateString);
     console.log('Manila time:', manilaTimeString);
@@ -447,29 +571,47 @@ function submitSchedule() {
     console.log('Converted start time 24h:', startHour24 + ':' + startMinute);
     console.log('Converted end time 24h:', endHour24 + ':' + endMinute);
     
-    // Check start time
-    const startIsPast = startHour24 < currentHour || (startHour24 === currentHour && startMinute < currentMinute);
-    console.log('Start time is past?', startIsPast);
+    // Calculate minimum booking time (current time + 1 hour)
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const minimumBookingMinutes = currentTotalMinutes + 60; // Add 1 hour (60 minutes)
+    const startTotalMinutes = startHour24 * 60 + startMinute;
+    const endTotalMinutes = endHour24 * 60 + endMinute;
     
-    if (startIsPast) {
+    console.log('Current total minutes:', currentTotalMinutes);
+    console.log('Minimum booking minutes (current + 1 hour):', minimumBookingMinutes);
+    console.log('Start time total minutes:', startTotalMinutes);
+    console.log('End time total minutes:', endTotalMinutes);
+    
+    // First check: Is the selected time in the past? (basic past time validation)
+    if (startTotalMinutes < currentTotalMinutes) {
       console.log('BLOCKING: Start time is in the past');
-      alert('Cannot book past time for today. Please select a future time.');
+      showPastTimeWarningModal.value = true;
       return;
     }
     
-    // Check end time
-    const endIsPast = endHour24 < currentHour || (endHour24 === currentHour && endMinute < currentMinute);
-    console.log('End time is past?', endIsPast);
-    
-    if (endIsPast) {
+    if (endTotalMinutes < currentTotalMinutes) {
       console.log('BLOCKING: End time is in the past');
-      alert('End time cannot be in the past for today. Please select a future time.');
+      showPastTimeWarningModal.value = true;
       return;
     }
     
-    console.log('=== TIME VALIDATION PASSED ===');
+    // Second check: Is the selected time at least 1 hour from now? (advance booking validation)
+    if (startTotalMinutes < minimumBookingMinutes) {
+      console.log('BLOCKING: Start time is less than 1 hour from now');
+      showOneHourWarningModal.value = true;
+      return;
+    }
+    
+    // Check end time - must be at least 1 hour from now
+    if (endTotalMinutes < minimumBookingMinutes) {
+      console.log('BLOCKING: End time is less than 1 hour from now');
+      showOneHourWarningModal.value = true;
+      return;
+    }
+    
+    console.log('=== 1-HOUR ADVANCE TIME VALIDATION PASSED ===');
   } else {
-    console.log('Date is not today, skipping time validation');
+    console.log('Date is not today, skipping 1-hour advance validation');
   }
   
   // Validate that end time is after start time
@@ -560,6 +702,14 @@ function viewMyBookings() {
 
 function closeLogoutModal() {
   showLogoutModal.value = false;
+}
+
+function closeOneHourWarningModal() {
+  showOneHourWarningModal.value = false;
+}
+
+function closePastTimeWarningModal() {
+  showPastTimeWarningModal.value = false;
 }
 
 function confirmLogout() {

@@ -38,6 +38,9 @@ Route::get('/booking/schedule', function () {
 })->middleware(['auth', 'verified']);
 
 Route::post('/booking/schedule', function (\Illuminate\Http\Request $request) {
+    // Process and pass the booking data to the schedule page
+    $bookingData = $request->all();
+    
     return Inertia::render('BookingSchedule', $bookingData);
 })->middleware(['auth', 'verified']);
 

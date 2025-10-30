@@ -16,6 +16,7 @@ interface RoomCategory {
     totalRooms: number;
     availableRooms: number;
     occupiedRooms: number;
+    reservedRooms: number;
     maintenanceRooms: number;
     capacity: string;
     amenities: string[];
@@ -71,9 +72,10 @@ const totalStats = computed(() => {
         acc.totalRooms += category.totalRooms;
         acc.availableRooms += category.availableRooms;
         acc.occupiedRooms += category.occupiedRooms;
+        acc.reservedRooms += category.reservedRooms;
         acc.maintenanceRooms += category.maintenanceRooms;
         return acc;
-    }, { totalRooms: 0, availableRooms: 0, occupiedRooms: 0, maintenanceRooms: 0 });
+    }, { totalRooms: 0, availableRooms: 0, occupiedRooms: 0, reservedRooms: 0, maintenanceRooms: 0 });
     
     return total;
 });
@@ -112,6 +114,8 @@ const getStatusColor = (status: string) => {
             return 'bg-green-100 text-green-800 border-green-200';
         case 'Occupied':
             return 'bg-red-100 text-red-800 border-red-200';
+        case 'Reserved':
+            return 'bg-blue-100 text-blue-800 border-blue-200';
         case 'Maintenance':
             return 'bg-yellow-100 text-yellow-800 border-yellow-200';
         default:
@@ -125,6 +129,8 @@ const getStatusBadgeClass = (status: string) => {
             return 'bg-green-100 text-green-800 border border-green-200';
         case 'Occupied':
             return 'bg-red-100 text-red-800 border border-red-200';
+        case 'Reserved':
+            return 'bg-blue-100 text-blue-800 border border-blue-200';
         case 'Maintenance':
             return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
         default:
@@ -332,7 +338,7 @@ const confirmDeleteRoom = async () => {
                 </div>
 
                 <!-- Statistics Cards -->
-                <div class="grid auto-rows-min gap-4 md:grid-cols-4">
+                <div class="grid auto-rows-min gap-4 md:grid-cols-5">
                     <Card class="stats-card">
                         <CardHeader class="pb-2">
                             <CardTitle class="text-sm font-medium" style="color: #FFFAE9 !important;">Total Rooms</CardTitle>
@@ -360,6 +366,16 @@ const confirmDeleteRoom = async () => {
                         <CardContent>
                             <div class="text-2xl font-bold" style="color: #fca5a5 !important;">{{ totalStats.occupiedRooms }}</div>
                             <p class="text-xs text-[#FFFAE9]/80">Currently in use</p>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card class="stats-card">
+                        <CardHeader class="pb-2">
+                            <CardTitle class="text-sm font-medium" style="color: #FFFAE9 !important;">Reserved</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-2xl font-bold" style="color: #93c5fd !important;">{{ totalStats.reservedRooms }}</div>
+                            <p class="text-xs text-[#FFFAE9]/80">Upcoming bookings</p>
                         </CardContent>
                     </Card>
                     
@@ -396,7 +412,7 @@ const confirmDeleteRoom = async () => {
                                         <Users class="w-4 h-4 mr-2 text-[#4b824b]" />
                                         Capacity: {{ category.capacity }}
                                     </div>
-                                    <div class="grid grid-cols-3 gap-2 text-xs">
+                                    <div class="grid grid-cols-4 gap-2 text-xs">
                                         <div class="text-center p-2 bg-green-50 rounded">
                                             <div class="font-bold text-green-600">{{ category.availableRooms }}</div>
                                             <div class="text-green-600">Available</div>
@@ -404,6 +420,10 @@ const confirmDeleteRoom = async () => {
                                         <div class="text-center p-2 bg-red-50 rounded">
                                             <div class="font-bold text-red-600">{{ category.occupiedRooms }}</div>
                                             <div class="text-red-600">Occupied</div>
+                                        </div>
+                                        <div class="text-center p-2 bg-blue-50 rounded">
+                                            <div class="font-bold text-blue-600">{{ category.reservedRooms }}</div>
+                                            <div class="text-blue-600">Reserved</div>
                                         </div>
                                         <div class="text-center p-2 bg-yellow-50 rounded">
                                             <div class="font-bold text-yellow-600">{{ category.maintenanceRooms }}</div>
@@ -566,7 +586,7 @@ const confirmDeleteRoom = async () => {
                                 <div class="pt-2 space-y-2">
                                     <!-- Maintenance Toggle Button -->
                                     <Button 
-                                        v-if="room.status !== 'Occupied'"
+                                        v-if="room.status !== 'Occupied' && room.status !== 'Reserved'"
                                         @click="toggleMaintenanceStatus(room)"
                                         :variant="room.status === 'Maintenance' ? 'default' : 'outline'"
                                         :class="room.status === 'Maintenance' 
@@ -580,7 +600,7 @@ const confirmDeleteRoom = async () => {
                                     
                                     <!-- Remove Room Button -->
                                     <Button 
-                                        v-if="room.status !== 'Occupied'"
+                                        v-if="room.status !== 'Occupied' && room.status !== 'Reserved'"
                                         @click="openDeleteConfirmModal(room)"
                                         variant="outline"
                                         class="w-full border-red-500 text-red-600 hover:bg-red-500 hover:text-white"
@@ -591,6 +611,9 @@ const confirmDeleteRoom = async () => {
                                     
                                     <div v-if="room.status === 'Occupied'" class="text-xs text-gray-500 text-center py-2">
                                         Cannot modify occupied room
+                                    </div>
+                                    <div v-if="room.status === 'Reserved'" class="text-xs text-blue-500 text-center py-2">
+                                        Cannot modify reserved room
                                     </div>
                                 </div>
                             </CardContent>

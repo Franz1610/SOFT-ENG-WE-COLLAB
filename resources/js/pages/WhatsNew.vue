@@ -61,26 +61,79 @@
         </div>
       </div>
     </main>
+
+    <!-- Logout Confirmation Modal -->
+    <Dialog :open="showLogoutModal" @update:open="closeLogoutModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Confirm Logout
+          </DialogTitle>
+          <DialogDescription class="text-center text-gray-600 mt-2">
+            Are you sure you want to log out?
+          </DialogDescription>
+        </DialogHeader>
+        
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeLogoutModal"
+            class="flex-1"
+            style="border-color: #495846; color: #495846;"
+          >
+            Cancel
+          </Button>
+          <Button 
+            @click="confirmLogout"
+            class="flex-1 text-white border-none logout-btn"
+          >
+            Logout
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 // Get authentication data from Inertia page props
 const page = usePage()
 const user = computed(() => page.props.auth?.user)
 
+// Modal state
+const showLogoutModal = ref(false)
+
 // Handle authentication actions
 const handleAuthAction = () => {
   if (user.value) {
-    // User is logged in, handle logout
-    router.post('/logout')
+    // User is logged in, show logout confirmation modal
+    showLogoutModal.value = true
   } else {
     // User is not logged in, redirect to login
     router.visit('/login')
   }
+}
+
+// Modal functions
+const closeLogoutModal = () => {
+  showLogoutModal.value = false
+}
+
+const confirmLogout = () => {
+  showLogoutModal.value = false
+  router.post('/logout')
 }
 
 // Handle logo and home button clicks
@@ -341,5 +394,15 @@ const goHome = () => {
   .header-inner {
     padding: 0.5rem 0.5rem;
   }
+}
+
+/* Modal button styles */
+.logout-btn {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+.logout-btn:hover {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
 }
 </style>
