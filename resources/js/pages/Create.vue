@@ -4,6 +4,14 @@
     <header class="header sticky-header">
       <div class="header-inner">
         <div class="logo" @click="goHome" role="button" tabindex="0">WECOLLAB</div>
+        <button
+          class="hamburger-btn"
+          @click="menuOpen = !menuOpen"
+          :aria-expanded="menuOpen"
+          aria-label="Toggle navigation menu"
+        >
+          <span class="hamburger-icon" aria-hidden="true"></span>
+        </button>
         <nav class="nav">
           <a 
             href="#" 
@@ -17,6 +25,19 @@
           <Link href="/booking" class="nav-link">Booking</Link>
           <button class="home-btn" @click="goHome">HOME</button>
         </nav>
+        <div v-if="menuOpen" class="mobile-menu">
+          <a
+            href="#"
+            @click.prevent="handleAuthAction(); menuOpen = false"
+            :class="['nav-link', { 'logout-link': user } ]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
+          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
+          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
+          <Link href="/booking" class="nav-link" @click="menuOpen = false">Booking</Link>
+          <button class="home-btn" @click="goHome">HOME</button>
+        </div>
       </div>
     </header>
 
@@ -118,6 +139,9 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 // Basic auth/header helpers (keeps header consistent with Home.vue)
 const page = usePage();
 const user = computed(() => page.props.auth?.user ?? null);
+
+// Mobile menu state
+const menuOpen = ref(false);
 
 function handleAuthAction() {
   if (user.value) {
@@ -264,6 +288,50 @@ function submitFeedback() {
   display: flex;
   gap: 1.5rem;
   align-items: center;
+}
+.hamburger-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+}
+.hamburger-icon {
+  display: inline-block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  position: relative;
+}
+.hamburger-icon::before,
+.hamburger-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+}
+.hamburger-icon::before { top: -7px; }
+.hamburger-icon::after { top: 7px; }
+.mobile-menu {
+  position: absolute;
+  top: 54px;
+  left: 0;
+  width: 100vw;
+  background: #495846;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem 1rem 1rem;
+  z-index: 150;
+}
+.mobile-menu .nav-link {
+  display: block;
+  padding: 0.75rem 0.8rem;
+  border-radius: 8px;
 }
 .nav-link {
   color: #fff;
@@ -438,6 +506,11 @@ function submitFeedback() {
 /* small screens */
 @media (max-width: 600px) {
   .modal-panel { margin: 0 12px; }
+}
+
+@media (max-width: 900px) {
+  .nav { display: none; }
+  .hamburger-btn { display: inline-flex; align-items: center; justify-content: center; }
 }
 
 /* thank-you message style */

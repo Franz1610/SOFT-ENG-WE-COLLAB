@@ -4,6 +4,14 @@
     <header class="header sticky-header">
       <div class="header-inner">
         <div class="logo" @click="goHome">WECOLLAB</div>
+        <button
+          class="hamburger-btn"
+          @click="menuOpen = !menuOpen"
+          :aria-expanded="menuOpen"
+          aria-label="Toggle navigation menu"
+        >
+          <span class="hamburger-icon" aria-hidden="true"></span>
+        </button>
         <nav class="nav">
           <a 
             href="#" 
@@ -17,6 +25,19 @@
           <span class="nav-link active">Booking</span>
           <Link href="/" class="nav-link">HOME</Link>
         </nav>
+        <div v-if="menuOpen" class="mobile-menu">
+          <a
+            href="#"
+            @click.prevent="handleAuthAction(); menuOpen = false"
+            :class="['nav-link', { 'logout-link': user } ]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
+          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
+          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
+          <span class="nav-link active" @click="menuOpen = false">Booking</span>
+          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
+        </div>
       </div>
     </header>
 
@@ -64,6 +85,15 @@
                   >
                     Cancel
                   </button>
+                  <!-- If booking is done (admin accepted), show Pay button instead of plain text -->
+                  <Button
+                    v-else-if="booking.status && booking.status.toLowerCase() === 'done'"
+                    @click="openPayModal(booking.id)"
+                    class="pay-btn"
+                    title="Pay for Booking"
+                  >
+                    Pay
+                  </Button>
                   <span v-else class="cannot-cancel-text">
                     Cannot cancel
                   </span>
@@ -167,6 +197,55 @@
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Pay Modal (QR + payment form) -->
+    <Dialog :open="showPayModal" @update:open="closePayModal">
+      <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white pay-dialog">
+        <div class="pay-modal-content">
+          <div class="pay-left">
+            <h2 class="pay-heading">Pay Booking <span v-if="payBookingId">#{{ payBookingId }}</span></h2>
+            <p class="pay-sub">Scan this QR with GCash:</p>
+            <div class="qr-card" aria-label="GCash QR Code">
+              <img src="/images/booking/gcash_qr.jpg" alt="GCash QR Code" class="qr-img" />
+            </div>
+          </div>
+          <div class="pay-right">
+            <form @submit.prevent="submitPayment" class="pay-form" novalidate>
+              <div class="form-group">
+                <label for="amountPaid" class="form-label">Amount Paid (PHP)</label>
+                <select id="amountPaid" v-model="amountPaid" class="input">
+                  <option disabled value="">Select amount</option>
+                  <option v-for="opt in allowedAmounts" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <div class="amount-info" v-if="activeBooking">
+                  Amount due: {{ formatCurrency(amountDue) }} • Paid: {{ formatCurrency(currentPaid) }} • Remaining: {{ formatCurrency(remainingAmount) }}
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="referenceNo" class="form-label">Reference No.</label>
+                <input id="referenceNo" v-model="referenceNo" type="text" class="input" placeholder="GCash reference" />
+              </div>
+              <div class="form-group">
+                <label for="proof" class="form-label">Upload Proof (Screenshot)</label>
+                <input id="proof" type="file" accept="image/*" class="file-input" @change="onFileChange" />
+                <div v-if="proofFile" class="file-meta">Selected: {{ proofFile.name }}</div>
+              </div>
+              <p v-if="amountHint" class="hint" aria-live="polite">{{ amountHint }}</p>
+              <div class="actions">
+                <Button type="submit" :disabled="isSubmitting" class="submit-btn text-white">{{ isSubmitting ? 'Pay…' : 'Pay' }}</Button>
+                <Button type="button" variant="outline" class="cancel-btn-alt" @click="closePayModal">Cancel</Button>
+              </div>
+              <!-- Promo image sits below the two buttons -->
+              <div class="promo-wrap" aria-label="Promo Rates">
+                <img src="/images/booking/promo_rates.jpg" alt="WeCollab Promo Rates" class="promo-img" />
+              </div>
+            </form>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -200,8 +279,56 @@ const paginatedBookings = computed(() =>
 
 // Modal state
 const showLogoutModal = ref(false);
+// Mobile menu state
+const menuOpen = ref(false);
 const showCancelModal = ref(false);
 const bookingToCancel = ref<number | null>(null);
+// Pay modal state
+const showPayModal = ref(false);
+const payBookingId = ref<number | null>(null);
+// Pay form state
+const amountPaid = ref<string>('');
+const referenceNo = ref<string>('');
+const proofFile = ref<File | null>(null);
+const isSubmitting = ref(false);
+const amountHint = ref<string>('');
+
+// Derive active booking and payment figures
+const activeBooking = computed(() => bookings.value.find(b => b.id === payBookingId.value) || null);
+// Fallbacks if fields not present in booking object
+const amountDue = computed(() => {
+  if (!activeBooking.value) return 0;
+  return activeBooking.value.amount_due ?? activeBooking.value.total ?? 0;
+});
+const currentPaid = computed(() => {
+  if (!activeBooking.value) return 0;
+  return activeBooking.value.amount_paid ?? activeBooking.value.paid ?? 0;
+});
+const remainingAmount = computed(() => Math.max(amountDue.value - currentPaid.value, 0));
+
+function formatCurrency(v: number) {
+  return v.toLocaleString('en-PH', { style: 'currency', currency: 'PHP' });
+}
+
+// Allowed dropdown amounts per category
+type AmountOption = { label: string; value: string };
+const allowedAmounts = computed<AmountOption[]>(() => {
+  const cat = (activeBooking.value?.category ?? '').toString().toLowerCase();
+  const make = (nums: number[], suffix = ''): AmountOption[] =>
+    nums.map(n => ({ label: `PHP ${n.toFixed(2)}${suffix}`, value: String(n) }));
+
+  if (cat.includes('individual') || cat.includes('indiv')) {
+    return make([39, 99, 195, 245]);
+  }
+  if (cat.includes('common')) {
+    return make([70, 120, 150, 200]);
+  }
+  if (cat.includes('master')) {
+    return make([200, 300], '/hr');
+  }
+  // Fallback: no predefined options
+  return [];
+});
 
 // Get status styling class
 function getStatusClass(status: string) {
@@ -250,6 +377,72 @@ function confirmCancelBooking() {
         bookingToCancel.value = null;
       }
     });
+  }
+}
+
+// Handle pay action for bookings that are done
+// Open the pay confirmation modal
+function openPayModal(bookingId: number) {
+  if (!bookingId) return;
+  payBookingId.value = bookingId;
+  showPayModal.value = true;
+}
+
+function closePayModal() {
+  showPayModal.value = false;
+  payBookingId.value = null;
+  amountPaid.value = '';
+  referenceNo.value = '';
+  proofFile.value = null;
+  isSubmitting.value = false;
+  amountHint.value = '';
+}
+
+// Confirm and navigate to payment route
+function confirmPayBooking() {
+  if (!payBookingId.value) return;
+  router.visit(`/booking/${payBookingId.value}/pay`);
+  showPayModal.value = false;
+  payBookingId.value = null;
+}
+
+function onFileChange(e: Event) {
+  const target = e.target as HTMLInputElement;
+  const files = target.files;
+  proofFile.value = files && files[0] ? files[0] : null;
+}
+
+async function submitPayment() {
+  if (!payBookingId.value) return;
+  const amt = parseFloat(amountPaid.value || '');
+  if (!amountPaid.value) {
+    amountHint.value = 'Please select an amount.';
+    return;
+  }
+  if (!(amt > 0)) {
+    amountHint.value = 'Invalid amount selected.';
+    return;
+  }
+  if (!referenceNo.value.trim()) {
+    amountHint.value = 'Please provide the GCash reference number.';
+    return;
+  }
+  amountHint.value = '';
+  try {
+    isSubmitting.value = true;
+    const data = new FormData();
+    data.append('amount_paid', String(amt));
+    data.append('reference_no', referenceNo.value.trim());
+    if (proofFile.value) data.append('proof', proofFile.value);
+    await router.post(`/booking/${payBookingId.value}/pay`, data, {
+      forceFormData: true,
+      preserveScroll: true,
+      onSuccess: () => { isSubmitting.value = false; closePayModal(); },
+      onError: () => { isSubmitting.value = false; }
+    } as any);
+  } catch (err) {
+    console.error('Payment submission error', err);
+    isSubmitting.value = false;
   }
 }
 
@@ -324,6 +517,50 @@ onMounted(() => {
   display: flex;
   gap: 1.5rem;
   align-items: center;
+}
+.hamburger-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+}
+.hamburger-icon {
+  display: inline-block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  position: relative;
+}
+.hamburger-icon::before,
+.hamburger-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+}
+.hamburger-icon::before { top: -7px; }
+.hamburger-icon::after { top: 7px; }
+.mobile-menu {
+  position: absolute;
+  top: 54px;
+  left: 0;
+  width: 100vw;
+  background: #495846;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem 1rem 1rem;
+  z-index: 150;
+}
+.mobile-menu .nav-link {
+  display: block;
+  padding: 0.75rem 0.8rem;
+  border-radius: 8px;
 }
 
 .nav-link {
@@ -490,6 +727,8 @@ main.main-content {
   .main-content {
     padding: 0.5em 0.2em;
   }
+  .nav { display: none; }
+  .hamburger-btn { display: inline-flex; align-items: center; justify-content: center; }
   .status-cell {
     flex-direction: column;
     gap: 0.2em;
@@ -499,5 +738,65 @@ main.main-content {
     font-size: 0.85em;
     padding: 0.15em 0.3em;
   }
+}
+
+/* Pay modal specific styles: widen without increasing length */
+/* Hide the default close (X) button for the Pay dialog only.
+   We target multiple possible class combinations to be resilient to library updates. */
+:deep(.pay-dialog .absolute.right-4.top-4),
+:deep(.pay-dialog button.absolute.right-4.top-4),
+:deep(.pay-dialog [class*="absolute"][class*="right-4"][class*="top-4"]) {
+  display: none !important;
+  pointer-events: none !important;
+}
+/* Pay modal layout */
+.pay-modal-content {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 1.25rem;
+}
+.pay-left { display: flex; flex-direction: column; gap: 0.5rem; }
+.pay-right { display: flex; }
+.pay-form { display: flex; flex-direction: column; gap: 0.9rem; width: 100%; }
+.pay-heading { font-size: 1.25rem; font-weight: 700; color: #111827; }
+.pay-sub { font-size: 0.95rem; color: #4b5563; }
+.qr-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #fafafa;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.qr-card .qr-img { max-height: 52vh; width: auto; border-radius: 8px; object-fit: contain; }
+.form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.form-label { font-size: 0.9rem; color: #374151; }
+.input { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 0.55rem 0.75rem; font-size: 0.95rem; }
+.file-input { width: 100%; }
+.file-meta { font-size: 0.8rem; color: #6b7280; }
+.amount-info { font-size: 0.85rem; color: #6b7280; }
+.hint { font-size: 0.85rem; color: #ef4444; }
+.actions { display: flex; gap: 0.6rem; margin-top: 0.25rem; }
+.submit-btn { background: #111827 !important; }
+.cancel-btn-alt { color: #111827; border-color: #111827; }
+.promo-wrap { margin-top: 0.75rem; }
+.promo-img {
+  width: 100%;
+  height: auto;
+  max-height: 32vh;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+@media (max-width: 768px) {
+  .pay-modal-content { grid-template-columns: 1fr; }
+  .qr-card .qr-img { max-height: 40vh; width: 100%; }
+  .promo-img { max-height: 25vh; }
+}
+/* Ensure dialog content can scroll vertically when content exceeds viewport */
+.pay-dialog {
+  overflow-y: auto;
 }
 </style>

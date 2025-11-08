@@ -131,6 +131,36 @@ class BookingController extends Controller
         return back()->with('success', 'Booking cancelled successfully');
     }
 
+    /**
+     * Show the payment page for a booking.
+     * Lightweight placeholder: renders an Inertia page with booking details.
+     */
+    public function pay($id)
+    {
+        $booking = Booking::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$booking) {
+            return redirect('/booking/history')->with('error', 'Booking not found');
+        }
+
+        // Only allow payment for confirmed/completed bookings (admin accepted)
+        if (!in_array($booking->status, ['confirmed', 'completed'])) {
+            return redirect('/booking/history')->with('error', 'This booking is not eligible for payment');
+        }
+
+        return Inertia::render('BookingPayment', [
+            'booking' => [
+                'id' => $booking->id,
+                'date' => $booking->booking_date->format('F j, Y'),
+                'time' => $booking->formatted_time,
+                'status' => $this->mapStatus($booking->status),
+                'amount' => $booking->amount ?? null,
+            ],
+        ]);
+    }
+
     private function convertTimeFormat($timeString)
     {
         // Convert "10:30 AM" format to "10:30:00" format

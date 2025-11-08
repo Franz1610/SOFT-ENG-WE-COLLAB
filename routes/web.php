@@ -59,6 +59,11 @@ Route::post('/booking/store', [\App\Http\Controllers\BookingController::class, '
 Route::post('/booking/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'cancel'])
     ->middleware(['auth', 'verified']);
 
+// Payment route for a booking (user must be authenticated)
+Route::get('/booking/{id}/pay', [\App\Http\Controllers\BookingController::class, 'pay'])
+    ->middleware(['auth', 'verified']);
+
+
 Route::middleware(['auth', 'verified'])->group(function () {
     // Routes for both Admin and Admin Officer (general admin access)
     Route::middleware('admin')->group(function () {

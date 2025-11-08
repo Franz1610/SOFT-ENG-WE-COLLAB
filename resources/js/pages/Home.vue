@@ -3,6 +3,16 @@
     <header class="header sticky-header">
       <div class="header-inner">
         <div class="logo">WECOLLAB</div>
+        <!-- Hamburger button (visible on small screens) -->
+        <button
+          class="hamburger-btn"
+          @click="menuOpen = !menuOpen"
+          :aria-expanded="menuOpen"
+          aria-label="Toggle navigation menu"
+        >
+          <span class="hamburger-icon" aria-hidden="true"></span>
+        </button>
+
         <nav class="nav">
           <a 
             href="#" 
@@ -16,6 +26,20 @@
           <Link href="/booking" class="nav-link">Booking</Link>
           <span class="nav-link active">HOME</span>
         </nav>
+        <!-- Mobile menu that appears when hamburger is toggled -->
+        <div v-if="menuOpen" class="mobile-menu">
+          <a
+            href="#"
+            @click.prevent="handleAuthAction(); menuOpen = false"
+            :class="['nav-link', { 'logout-link': user } ]"
+          >
+            {{ user ? 'Log out' : 'Log in' }}
+          </a>
+          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
+          <Link href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</Link>
+          <Link href="/booking" class="nav-link" @click="menuOpen = false">Booking</Link>
+          <span class="nav-link active" @click="menuOpen = false">HOME</span>
+        </div>
       </div>
     </header>
     <main class="main-content">
@@ -228,6 +252,53 @@ html, body, #app, .main-content {
   gap: 1.5rem;
   align-items: center;
 }
+
+/* Hamburger & mobile menu styles */
+.hamburger-btn {
+  display: none; /* shown only on small screens */
+  background: transparent;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #fff;
+}
+.hamburger-icon {
+  display: inline-block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  position: relative;
+}
+.hamburger-icon::before,
+.hamburger-icon::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+}
+.hamburger-icon::before { top: -7px; }
+.hamburger-icon::after { top: 7px; }
+
+.mobile-menu {
+  position: absolute;
+  top: 54px;
+  left: 0;
+  width: 100vw;
+  background: #495846;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem 1rem 1rem;
+  z-index: 150;
+}
+.mobile-menu .nav-link {
+  display: block;
+  padding: 0.75rem 0.8rem;
+  border-radius: 8px;
+}
 .nav-link {
   color: #fff;
   text-decoration: none;
@@ -305,6 +376,15 @@ section, .hero {
   section, .hero {
     padding-left: 0 !important;
     padding-right: 0 !important;
+  }
+  /* On small screens hide inline nav and show hamburger */
+  .nav {
+    display: none;
+  }
+  .hamburger-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 
@@ -598,6 +678,9 @@ const user = computed(() => page.props.auth.user);
 
 // Modal state
 const showLogoutModal = ref(false);
+
+// Mobile menu state for small screens
+const menuOpen = ref(false);
 
 function closeLogoutModal() {
   showLogoutModal.value = false;
