@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\FinanceEntry;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -159,6 +160,71 @@ class BookingController extends Controller
                 'amount' => $booking->amount ?? null,
             ],
         ]);
+    }
+
+    /**
+     * Handle payment submission with optional proof image.
+     */
+    public function submitPayment(Request $request, $id)
+    {
+        $booking = Booking::where('id', $id)
+            ->where('user_id', auth()->id())
+            ->first();
+
+        if (!$booking) {
+            return redirect('/booking/history')->with('error', 'Booking not found');
+        }
+
+        // Only allow payment for confirmed/completed bookings
+        if (!in_array($booking->status, ['confirmed', 'completed'])) {
+            return redirect('/booking/history')->with('error', 'This booking is not eligible for payment');
+        }
+
+        $validated = $request->validate([
+            'amount_paid' => ['required', 'numeric', 'min:1'],
+            'reference_no' => ['required', 'string', 'max:255'],
+            'proof' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:5120'], // 5MB
+        ]);
+
+        $proofPath = null;
+        if ($request->hasFile('proof')) {
+            // Store on public disk so it can be served; requires `php artisan storage:link` once
+            $proofPath = $request->file('proof')->store('payment_proofs', 'public');
+        }
+
+        // Create or update a FinanceEntry for this booking
+        $entry = FinanceEntry::where('booking_id', $booking->id)->first();
+        $notes = 'GCash Ref: ' . $validated['reference_no'];
+        if ($proofPath) {
+            $notes .= ' | proof: storage/' . $proofPath;
+        }
+
+        if ($entry) {
+            // Incremental payment: accumulate amount and append notes
+            $entry->amount_received = (float)$entry->amount_received + (float)$validated['amount_paid'];
+            $entry->gross_total = (float)$entry->gross_total + (float)$validated['amount_paid'];
+            $entry->reference_notes = trim(($entry->reference_notes ?: '') . "\n" . $notes);
+            $entry->net_revenue = (float)$entry->amount_received - (float)$entry->gateway_fee - (float)$entry->tax_collected;
+            $entry->save();
+        } else {
+            FinanceEntry::create([
+                'booking_id' => $booking->id,
+                'customer_name' => $booking->first_name . ' ' . $booking->last_name,
+                'gross_total' => $validated['amount_paid'],
+                'transaction_date' => now()->toDateString(),
+                'amount_received' => $validated['amount_paid'],
+                'payment_method' => 'Other', // GCash treated as other for now
+                'gateway_fee' => 0,
+                'tax_collected' => 0,
+                'reference_notes' => $notes,
+                'net_revenue' => $validated['amount_paid'],
+                'status' => 'Pending Review',
+                'created_by' => auth()->id(),
+                'reviewed_by' => null,
+            ]);
+        }
+
+        return redirect('/booking/history')->with('success', 'Payment submitted. Your proof is pending review.');
     }
 
     private function convertTimeFormat($timeString)

@@ -59,8 +59,11 @@ Route::post('/booking/store', [\App\Http\Controllers\BookingController::class, '
 Route::post('/booking/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'cancel'])
     ->middleware(['auth', 'verified']);
 
-// Payment route for a booking (user must be authenticated)
+// Payment routes for a booking (user must be authenticated)
 Route::get('/booking/{id}/pay', [\App\Http\Controllers\BookingController::class, 'pay'])
+    ->middleware(['auth', 'verified']);
+// Submit payment proof (image) + details
+Route::post('/booking/{id}/pay', [\App\Http\Controllers\BookingController::class, 'submitPayment'])
     ->middleware(['auth', 'verified']);
 
 
