@@ -30,6 +30,31 @@ class BookingController extends Controller
         $startTime = $this->convertTimeFormat($validated['start_time']);
         $endTime = $this->convertTimeFormat($validated['end_time']);
 
+        // Basic logical checks beyond form validation
+        if ($startTime === '00:00:00' || $endTime === '00:00:00') {
+            return back()->with('error', 'Invalid time format provided.');
+        }
+        if ($startTime >= $endTime) {
+            return back()->with('error', 'End time must be after start time.');
+        }
+
+        // Prevent overlapping bookings (pending or confirmed) for same room and date
+        $overlap = Booking::where('booking_date', $validated['booking_date'])
+            ->where('room_id', $validated['room_id'])
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where(function($q) use ($startTime, $endTime) {
+                $q->where(function($inner) use ($startTime, $endTime) {
+                    // Existing booking starts before new end AND ends after new start => overlap
+                    $inner->where('start_time', '<', $endTime)
+                          ->where('end_time', '>', $startTime);
+                });
+            })
+            ->exists();
+
+        if ($overlap) {
+            return back()->with('error', 'Selected time overlaps with an existing booking for this room.');
+        }
+
         $booking = Booking::create([
             'user_id' => auth()->id(),
             'first_name' => $validated['first_name'],
@@ -46,7 +71,8 @@ class BookingController extends Controller
             'status' => 'pending', // Mark as pending when created - requires admin approval
         ]);
 
-        return redirect()->back()->with('success', 'Booking submitted successfully! Please wait for admin approval.');
+        // Return to booking history so user can see the pending booking
+        return redirect('/booking/history')->with('success', 'Booking submitted successfully! Please wait for admin approval.');
     }
 
     public function getUserBookings()
@@ -56,12 +82,19 @@ class BookingController extends Controller
             ->orderBy('start_time', 'desc')
             ->get()
             ->map(function ($booking) {
+                // Determine payment state from finance entry
+                $finance = $booking->financeEntry;
+                $paid = $finance && $finance->status === 'Verified';
+                $rejected = $finance && $finance->status === 'Unprocessed' && $finance->decline_reason;
+                $pendingPayment = !$paid && !$rejected && $finance && $finance->status === 'Pending Review';
                 return [
                     'id' => $booking->id,
                     'date' => $booking->booking_date->format('F j, Y'),
                     'category' => ucfirst($booking->category) . ' room',
                     'time' => $booking->formatted_time,
-                    'status' => $this->mapStatus($booking->status),
+                    'status' => $paid ? 'Paid' : ($rejected ? 'Rejected' : ($pendingPayment ? 'Pending Payment' : $this->mapStatus($booking->status))),
+                    'paid' => $paid,
+                    'decline_reason' => $rejected ? $finance->decline_reason : null,
                     'can_cancel' => $booking->status === 'pending' && $booking->booking_date >= now()->toDateString(),
                 ];
             });
@@ -200,6 +233,11 @@ class BookingController extends Controller
         }
 
         if ($entry) {
+            // If previously declined or unprocessed, reset review state for resubmission
+            $entry->status = 'Pending Review';
+            $entry->reviewed_by = null;
+            $entry->decline_reason = null;
+            $entry->declined_at = null;
             // Incremental payment: accumulate amount and append notes
             $entry->amount_received = (float)$entry->amount_received + (float)$validated['amount_paid'];
             $entry->gross_total = (float)$entry->gross_total + (float)$validated['amount_paid'];
@@ -217,6 +255,7 @@ class BookingController extends Controller
                 'gateway_fee' => 0,
                 'tax_collected' => 0,
                 'reference_notes' => $notes,
+                'decline_reason' => null,
                 'net_revenue' => $validated['amount_paid'],
                 'status' => 'Pending Review',
                 'created_by' => auth()->id(),
@@ -229,16 +268,21 @@ class BookingController extends Controller
 
     private function convertTimeFormat($timeString)
     {
-        // Convert "10:30 AM" format to "10:30:00" format
+        // Convert "10:30 AM" or "09:20 PM" format to "HH:MM:SS"
         try {
-            return Carbon::createFromFormat('g:i A', $timeString)->format('H:i:s');
+            // Try with leading-zero hour first
+            return Carbon::createFromFormat('h:i A', $timeString)->format('H:i:s');
         } catch (\Exception $e) {
             // If parsing fails, try other formats
             try {
-                return Carbon::createFromFormat('H:i A', $timeString)->format('H:i:s');
+                return Carbon::createFromFormat('g:i A', $timeString)->format('H:i:s');
             } catch (\Exception $e) {
-                // Default fallback
-                return '00:00:00';
+                try {
+                    return Carbon::createFromFormat('H:i', $timeString)->format('H:i:s');
+                } catch (\Exception $e) {
+                    // Default fallback
+                    return '00:00:00';
+                }
             }
         }
     }

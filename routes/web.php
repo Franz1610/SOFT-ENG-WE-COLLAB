@@ -2,10 +2,11 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\Admin\FeedbackController;
+use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\Admin\PaymentController;
 
 Route::get('/', function () {
     return Inertia::render('Home');
@@ -117,19 +118,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]);
         });
         
-        // Room management - both admin and admin officer
+    // Room management - both admin and admin officer
         Route::get('/admin/rooms', [\App\Http\Controllers\RoomManagementController::class, 'index']);
         Route::get('/admin/rooms/{category}', [\App\Http\Controllers\RoomManagementController::class, 'getRoomData']);
         Route::post('/admin/rooms/maintenance', [\App\Http\Controllers\RoomManagementController::class, 'updateMaintenanceStatus']);
         Route::post('/admin/rooms/add', [\App\Http\Controllers\RoomManagementController::class, 'addRooms']);
         Route::delete('/admin/rooms/delete', [\App\Http\Controllers\RoomManagementController::class, 'deleteRoom']);
         
-        // Booking management - both admin and admin officer
+    // Booking management - both admin and admin officer
         Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);
         Route::post('/admin/bookings/{id}/reject', [\App\Http\Controllers\BookingController::class, 'reject']);
         Route::post('/admin/bookings/{id}/cancel', [\App\Http\Controllers\BookingController::class, 'adminCancel']);
         
-        // Debug route - both admin and admin officer
+    // Manage Payments - admin officer / finance access
+    Route::get('/admin/payments', [PaymentController::class, 'index'])->name('admin.payments.index');
+    // Serve proof image securely via controller to avoid 403/symlink issues
+    Route::get('/admin/payments/{financeEntry}/proof', [PaymentController::class, 'proof'])->name('admin.payments.proof');
+    Route::post('/admin/payments/{id}/accept', [PaymentController::class, 'accept'])->name('admin.payments.accept');
+    Route::post('/admin/payments/{id}/decline', [PaymentController::class, 'decline'])->name('admin.payments.decline');
+
+    // Debug route - both admin and admin officer
         Route::get('/admin/debug-bookings', function () {
             $today = \Carbon\Carbon::today();
             $allBookings = \App\Models\Booking::where('status', 'confirmed')

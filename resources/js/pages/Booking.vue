@@ -239,7 +239,7 @@ const form = ref({
   firstName: '',
   lastName: '',
   contact: '',
-  email: '',
+  email: (user.value?.email as string) || '',
   additional: '',
   pax: '',
 });
@@ -327,6 +327,40 @@ onMounted(() => {
   updateRoomAvailability();
 });
 
+// Prefill the email field from the logged-in user (editable by user if needed)
+onMounted(() => {
+  // Prefill email if empty
+  if (!form.value.email && user.value?.email) {
+    form.value.email = user.value.email as string;
+  }
+
+  // Attempt to parse user's name into first/last if those fields are empty
+  if (user.value?.name) {
+    const nameStr = (user.value.name as string).trim();
+    if (nameStr && (!form.value.firstName || !form.value.lastName)) {
+      const parts = nameStr.split(/\s+/);
+      if (parts.length === 1) {
+        // Single word name - use as first name, keep last empty for user to fill
+        if (!form.value.firstName) form.value.firstName = parts[0];
+      } else {
+        // Use first token as first name and last token as last name
+        if (!form.value.firstName) form.value.firstName = parts[0];
+        if (!form.value.lastName) form.value.lastName = parts[parts.length - 1];
+      }
+    }
+  }
+
+  // If user has a profile contact (extend later if added to user model / props)
+  // We check common prop locations to avoid errors; currently not present in User model
+  // but placeholder logic allows easy future addition.
+  const possibleContact = (page.props as any).profile?.contact
+    || (page.props as any).user?.contact
+    || (page.props as any).auth?.user?.contact;
+  if (!form.value.contact && typeof possibleContact === 'string') {
+    form.value.contact = possibleContact;
+  }
+});
+
 const selectedRoom = ref<number|null>(null);
 
 function selectRoom(id: number) {
@@ -368,7 +402,7 @@ function validateContactNumber(event: Event) {
 // Clamp pax input between 1 and 10
 function validatePax(event: Event) {
   const target = event.target as HTMLInputElement;
-  let val = target.value.replace(/[^0-9]/g, '');
+  const val = target.value.replace(/[^0-9]/g, '');
   if (val === '') {
     target.value = '';
     form.value.pax = '';
@@ -440,9 +474,7 @@ function submitBooking() {
   });
 }
 
-function goHome() {
-  window.location.href = '/';
-}
+// Removed unused goHome() function (navigation handled via links/buttons elsewhere)
 
 function goToBookingHistory() {
   router.visit('/booking/history');

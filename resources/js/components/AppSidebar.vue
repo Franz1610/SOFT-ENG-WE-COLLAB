@@ -50,6 +50,12 @@ const mainNavItems = computed((): NavItem[] => {
             href: '/admin/finance',
             icon: Folder,
         });
+        // Manage Payments shortcut
+        items.push({
+            title: 'Manage Payments',
+            href: '/admin/payments',
+            icon: Folder,
+        });
     }
 
     // Feedback Management - only available to admin officer

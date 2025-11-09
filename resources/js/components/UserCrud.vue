@@ -48,9 +48,7 @@ function canBlockUser(targetUser: User): boolean {
     return false;
 }
 
-function editUser(userId: number) {
-    router.visit(`/admin/users/${userId}/edit`);
-}
+// Removed editUser and Edit action per requirement: dashboard should only allow block/unblock
 
 function openBlockModal(user: User) {
     userToBlock.value = user;
@@ -112,12 +110,6 @@ function confirmToggleBlock() {
                     </td>
                     <td>
                         <div class="flex gap-3">
-                            <button 
-                                @click="editUser(user.id)" 
-                                class="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors font-medium"
-                            >
-                                Edit
-                            </button>
                             <button 
                                 v-if="canBlockUser(user)"
                                 @click="openBlockModal(user)"

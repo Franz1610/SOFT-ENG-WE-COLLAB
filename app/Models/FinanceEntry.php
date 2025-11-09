@@ -16,6 +16,8 @@ class FinanceEntry extends Model
         'gateway_fee',
         'tax_collected',
         'reference_notes',
+        'decline_reason',
+        'declined_at',
         'net_revenue',
         'status',
         'created_by',
@@ -29,6 +31,7 @@ class FinanceEntry extends Model
         'gateway_fee' => 'decimal:2',
         'tax_collected' => 'decimal:2',
         'net_revenue' => 'decimal:2',
+        'declined_at' => 'datetime',
     ];
 
     public function booking()

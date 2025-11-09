@@ -389,6 +389,66 @@ onMounted(() => {
   
   // Update every second (1000ms)
   timeUpdateInterval = setInterval(updateTimeDisplays, 1000);
+
+  // Prefill defaults: if landing on this page for today with empty fields,
+  // set start/end to the earliest allowed time (now + 1 hour, Manila time)
+  try {
+    // Set default date to today if not provided
+    const todayManila = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(new Date());
+    if (!form.value.date) {
+      form.value.date = todayManila;
+    }
+
+    // Only set default times if empty
+    const startEmpty = !form.value.startTime.hour || !form.value.startTime.minute;
+    const endEmpty = !form.value.endTime.hour || !form.value.endTime.minute;
+    if (startEmpty && endEmpty) {
+      const now = new Date();
+      const manilaString24 = now.toLocaleString('en-US', {
+        timeZone: 'Asia/Manila',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const [h, m] = manilaString24.split(':').map(Number);
+      // Minimum = now + 60 minutes
+      let mins = h * 60 + m + 60;
+      // Round up to nearest 5 minutes for nicer UX
+      const round = 5;
+      mins = Math.ceil(mins / round) * round;
+      const startHour24 = Math.floor(mins / 60) % 24;
+      const startMin = mins % 60;
+      const startPeriod = startHour24 >= 12 ? 'PM' : 'AM';
+      let startHour12 = startHour24 % 12;
+      if (startHour12 === 0) startHour12 = 12;
+
+      // End time = start + 60 minutes
+      let endMins = mins + 60;
+      const endHour24 = Math.floor(endMins / 60) % 24;
+      const endMin = endMins % 60;
+      const endPeriod = endHour24 >= 12 ? 'PM' : 'AM';
+      let endHour12 = endHour24 % 12;
+      if (endHour12 === 0) endHour12 = 12;
+
+      form.value.startTime = {
+        hour: String(startHour12).padStart(2, '0'),
+        minute: String(startMin).padStart(2, '0'),
+        period: startPeriod
+      };
+      form.value.endTime = {
+        hour: String(endHour12).padStart(2, '0'),
+        minute: String(endMin).padStart(2, '0'),
+        period: endPeriod
+      };
+    }
+  } catch (e) {
+    // Non-fatal: ignore and let user choose manually
+  }
 });
 
 // Cleanup interval when component unmounts
@@ -619,16 +679,37 @@ function submitSchedule() {
       return;
     }
     
-    // Second check: Is the selected time at least 1 hour from now? (advance booking validation)
-    if (startTotalMinutes < minimumBookingMinutes) {
-      console.log('BLOCKING: Start time is less than 1 hour from now');
-      showOneHourWarningModal.value = true;
-      return;
-    }
-    
-    // Check end time - must be at least 1 hour from now
-    if (endTotalMinutes < minimumBookingMinutes) {
-      console.log('BLOCKING: End time is less than 1 hour from now');
+    // Second check: Is the selected time at least 1 hour from now?
+    // If not, auto-adjust to the earliest allowed time for better UX and inform via modal.
+    if (startTotalMinutes < minimumBookingMinutes || endTotalMinutes < minimumBookingMinutes) {
+      console.log('ADJUSTING: Selected time is less than 1 hour from now; snapping to earliest allowed.');
+      let mins = minimumBookingMinutes;
+      // Round up to nearest 5 minutes
+      const round = 5;
+      mins = Math.ceil(mins / round) * round;
+      const sHour24 = Math.floor(mins / 60) % 24;
+      const sMin = mins % 60;
+      const sPeriod = sHour24 >= 12 ? 'PM' : 'AM';
+      let sHour12 = sHour24 % 12; if (sHour12 === 0) sHour12 = 12;
+
+      const eMins = mins + 60; // one-hour duration default
+      const eHour24 = Math.floor(eMins / 60) % 24;
+      const eMin = eMins % 60;
+      const ePeriod = eHour24 >= 12 ? 'PM' : 'AM';
+      let eHour12 = eHour24 % 12; if (eHour12 === 0) eHour12 = 12;
+
+      form.value.startTime = {
+        hour: String(sHour12).padStart(2, '0'),
+        minute: String(sMin).padStart(2, '0'),
+        period: sPeriod,
+      };
+      form.value.endTime = {
+        hour: String(eHour12).padStart(2, '0'),
+        minute: String(eMin).padStart(2, '0'),
+        period: ePeriod,
+      };
+
+      // Show informative warning modal using existing UI
       showOneHourWarningModal.value = true;
       return;
     }
@@ -681,9 +762,10 @@ function confirmBooking() {
       showConfirmationModal.value = false;
       router.visit('/');
     },
-    onError: (errors) => {
+    onError: (errors: any) => {
       console.error('Booking error:', errors);
-      alert('There was an error creating your booking. Please try again.');
+      const first = errors?.first_name || errors?.booking_date || errors?.start_time || errors?.end_time || errors?.room_id;
+      alert(first ? String(first) : 'There was an error creating your booking. Please try again.');
     }
   });
 }
@@ -717,9 +799,10 @@ function viewMyBookings() {
       showConfirmationModal.value = false;
       router.visit('/booking/history');
     },
-    onError: (errors) => {
+    onError: (errors: any) => {
       console.error('Booking error:', errors);
-      alert('There was an error creating your booking. Please try again.');
+      const first = errors?.first_name || errors?.booking_date || errors?.start_time || errors?.end_time || errors?.room_id;
+      alert(first ? String(first) : 'There was an error creating your booking. Please try again.');
     }
   });
 }

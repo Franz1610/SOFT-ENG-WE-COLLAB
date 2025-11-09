@@ -71,7 +71,8 @@
                 <div>{{ booking.category }}</div>
                 <div>{{ booking.time }}</div>
                 <div class="status-cell">
-                  <span 
+                  <span
+                    v-if="booking.status && !['pending payment','paid','rejected'].includes(booking.status.toLowerCase())"
                     :class="getStatusClass(booking.status)"
                     class="status-badge"
                   >
@@ -94,6 +95,16 @@
                   >
                     Pay
                   </Button>
+                  <span v-else-if="booking.status && booking.status.toLowerCase() === 'pending payment'" class="status-badge bg-yellow-100 text-yellow-800">Pending Payment</span>
+                  <template v-else-if="booking.status && booking.status.toLowerCase() === 'rejected'">
+                    <span class="status-badge bg-red-200 text-red-800 mr-2">Rejected</span>
+                    <Button
+                      @click="openPayModal(booking.id)"
+                      class="pay-btn"
+                      title="Resubmit Payment"
+                    >Resubmit</Button>
+                  </template>
+                  <span v-else-if="booking.status && booking.status.toLowerCase() === 'paid'" class="status-badge bg-green-200 text-green-900">Paid</span>
                   <span v-else class="cannot-cancel-text">
                     Cannot cancel
                   </span>
@@ -333,6 +344,10 @@ const allowedAmounts = computed<AmountOption[]>(() => {
 // Get status styling class
 function getStatusClass(status: string) {
   switch (status.toLowerCase()) {
+    case 'paid':
+      return 'bg-green-200 text-green-900';
+    case 'pending payment':
+      return 'bg-yellow-100 text-yellow-800';
     case 'pending':
       return 'bg-yellow-100 text-yellow-800';
     case 'cancelled':
@@ -399,12 +414,7 @@ function closePayModal() {
 }
 
 // Confirm and navigate to payment route
-function confirmPayBooking() {
-  if (!payBookingId.value) return;
-  router.visit(`/booking/${payBookingId.value}/pay`);
-  showPayModal.value = false;
-  payBookingId.value = null;
-}
+// Deprecated legacy redirect (no longer used) removed to satisfy linter
 
 function onFileChange(e: Event) {
   const target = e.target as HTMLInputElement;
@@ -437,7 +447,14 @@ async function submitPayment() {
     await router.post(`/booking/${payBookingId.value}/pay`, data, {
       forceFormData: true,
       preserveScroll: true,
-      onSuccess: () => { isSubmitting.value = false; closePayModal(); },
+      onSuccess: () => {
+        // Optimistic local update: mark booking as Pending Payment
+        const idx = bookings.value.findIndex(b => b.id === payBookingId.value);
+        if (idx !== -1) {
+          bookings.value[idx].status = 'Pending Payment';
+        }
+        isSubmitting.value = false; closePayModal();
+      },
       onError: () => { isSubmitting.value = false; }
     } as any);
   } catch (err) {
