@@ -8,10 +8,33 @@ defineProps<Props>();
 </script>
 
 <template>
-    <div class="mb-8 space-y-0.5">
-        <h2 class="text-xl font-semibold tracking-tight">{{ title }}</h2>
-        <p v-if="description" class="text-sm text-muted-foreground">
+    <div class="heading-container">
+        <h2 class="heading-title">{{ title }}</h2>
+        <p v-if="description" class="heading-description">
             {{ description }}
         </p>
     </div>
 </template>
+
+<style scoped>
+.heading-container {
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.heading-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #4b824b;
+    line-height: 1.25;
+    letter-spacing: -0.025em;
+}
+
+.heading-description {
+    font-size: 0.875rem;
+    color: #6b956b;
+    line-height: 1.5;
+}
+</style>

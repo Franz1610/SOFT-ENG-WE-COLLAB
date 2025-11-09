@@ -29,6 +29,7 @@ interface Booking {
     room_name: string;
     status: string;
     created_at: string;
+    additional_info?: string;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -121,6 +122,22 @@ function formatDate(dateString: string) {
         day: 'numeric'
     });
 }
+
+function getBookingType(booking: Booking) {
+    // Check if it's a walk-in booking based on additional_info field
+    if (booking.additional_info && booking.additional_info.includes('Walk-in booking')) {
+        return 'Walk-in';
+    }
+    return 'Online';
+}
+
+function getBookingTypeBadgeClass(booking: Booking) {
+    const type = getBookingType(booking);
+    if (type === 'Walk-in') {
+        return 'bg-orange-100 text-orange-800 border border-orange-200';
+    }
+    return 'bg-blue-100 text-blue-800 border border-blue-200';
+}
 </script>
 
 <template>
@@ -147,6 +164,7 @@ function formatDate(dateString: string) {
                                 <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Room</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Date</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Time</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Type</th>
                                 <th class="px-4 py-3 text-center text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Status</th>
                                 <th class="px-4 py-3 text-center text-xs font-medium text-[#FFFAE9] uppercase tracking-wider">Actions</th>
                             </tr>
@@ -162,6 +180,14 @@ function formatDate(dateString: string) {
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ booking.room_name }}</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ formatDate(booking.booking_date) }}</td>
                                 <td class="px-4 py-3 whitespace-nowrap text-sm text-[#4b824b] text-left">{{ booking.formatted_time }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap text-center">
+                                    <span 
+                                        class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                                        :class="getBookingTypeBadgeClass(booking)"
+                                    >
+                                        {{ getBookingType(booking) }}
+                                    </span>
+                                </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-center">
                                     <span 
                                         class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"

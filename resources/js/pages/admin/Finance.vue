@@ -7,7 +7,8 @@ const props = defineProps<{
   transactions: any[],
   summary: { income: number, expense: number, net: number, revenue: number },
   incomeCategories: string[],
-  expenseCategories: string[]
+  expenseCategories: string[],
+  miscIncomeCategories: string[]
 }>();
 
 // Get current user from shared props
@@ -30,8 +31,12 @@ const form = ref({
 const categoryOptions = computed(() => {
   if (form.value.type === 'income') {
     return ['Booking Payment', 'Additional Service', 'Other Income'];
-  } else {
+  } else if (form.value.type === 'expense') {
     return ['Maintenance', 'Utilities', 'Supplies', 'Staff Salary'];
+  } else if (form.value.type === 'Misc. Income') {
+    return ['Ad-hoc Income'];
+  } else {
+    return [];
   }
 });
 
@@ -39,11 +44,15 @@ const categoryOptions = computed(() => {
 const filterCategoryOptions = computed(() => {
   if (!filterType.value || filterType.value === '') {
     // Show all categories when "All Types" is selected
-    return [...props.incomeCategories, ...props.expenseCategories];
+    return [...props.incomeCategories, ...props.expenseCategories, ...props.miscIncomeCategories];
   } else if (filterType.value === 'expense') {
     return props.expenseCategories;
-  } else {
+  } else if (filterType.value === 'income') {
     return props.incomeCategories;
+  } else if (filterType.value === 'Misc. Income') {
+    return props.miscIncomeCategories;
+  } else {
+    return [];
   }
 });
 
@@ -95,12 +104,32 @@ function closeModal() {
   document.body.style.overflow = '';
 }
 
+// Helper function to refresh data while maintaining current filters
+function refreshData() {
+  const currentFilters = {
+    type: filterType.value,
+    category: filterCategory.value,
+    start_date: filterStart.value,
+    end_date: filterEnd.value
+  };
+  
+  router.get('/admin/finance', currentFilters, {
+    preserveState: false,
+    preserveScroll: true,
+    onSuccess: (page) => {
+      filteredTransactions.value = page.props.transactions as any[];
+      filteredSummary.value = page.props.summary as { income: number; expense: number; net: number; revenue: number };
+    }
+  });
+}
+
 function submit() {
   if (editId.value) {
     router.put(`/admin/finance/transactions/${editId.value}`, form.value, { 
       onSuccess: () => { 
         closeModal(); 
-        router.reload(); 
+        // Refresh data while maintaining current filters
+        refreshData();
       },
       onError: (errors) => {
         console.error('Update error:', errors);
@@ -111,7 +140,8 @@ function submit() {
     router.post('/admin/finance/transactions', form.value, { 
       onSuccess: () => { 
         closeModal(); 
-        router.reload(); 
+        // Refresh data while maintaining current filters
+        refreshData();
       },
       onError: (errors) => {
         console.error('Create error:', errors);
@@ -137,7 +167,12 @@ function remove(id: number) {
   if (confirm('Delete this transaction?')) {
     // Check if it's a general transaction (not a finance entry)
     if (String(id).startsWith('transaction_')) {
-      router.delete(`/admin/finance/transactions/${id}`, { onSuccess: () => router.reload() });
+      router.delete(`/admin/finance/transactions/${id}`, { 
+        onSuccess: () => {
+          // Refresh data while maintaining current filters
+          refreshData();
+        }
+      });
     } else {
       alert('Finance entries cannot be deleted from this interface.');
     }
@@ -256,6 +291,7 @@ function capitalizeFirst(str: string) {
           <option value="">All Types</option>
           <option value="income">Income</option>
           <option value="expense">Expense</option>
+          <option value="Misc. Income">Misc. Income</option>
         </select>
         <select v-model="filterCategory">
           <option value="">All Categories</option>
@@ -346,6 +382,7 @@ function capitalizeFirst(str: string) {
               <select v-model="form.type" required @change="form.category = ''" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; color: #333;">
                 <option value="income">Income</option>
                 <option value="expense">Expense</option>
+                <option value="Misc. Income">Misc. Income</option>
               </select>
             </div>
             

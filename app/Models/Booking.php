@@ -21,12 +21,14 @@ class Booking extends Model
         'start_time',
         'end_time',
         'status',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'booking_date' => 'date',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
+        'reminder_sent_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
@@ -46,13 +48,43 @@ class Booking extends Model
 
     public function getRoomNameAttribute(): string
     {
-        $roomNames = [
-            1 => 'Individual Room',
-            2 => 'Master Room',
-            3 => 'Common Room',
-        ];
+        // Handle mapped integer IDs from walk-in bookings
+        if (is_numeric($this->room_id)) {
+            $roomId = (int)$this->room_id;
+            
+            // Check if it's a mapped room ID (1000+, 2000+, 3000+)
+            if ($roomId >= 3000) {
+                // Master room
+                return "Master Room";
+            } elseif ($roomId >= 2000) {
+                // Common room
+                return "Common Room";
+            } elseif ($roomId >= 1000) {
+                // Individual room
+                return "Individual Room";
+            }
+            
+            // Fallback for legacy numeric room IDs (1, 2, 3)
+            $roomNames = [
+                1 => 'Individual Room',
+                2 => 'Master Room',
+                3 => 'Common Room',
+            ];
+            return $roomNames[$roomId] ?? 'Unknown Room';
+        }
+        
+        // Handle string room IDs (legacy - shouldn't happen with new system)
+        if (is_string($this->room_id)) {
+            if (str_starts_with($this->room_id, 'IND-')) {
+                return 'Individual Room';
+            } elseif (str_starts_with($this->room_id, 'COM-')) {
+                return 'Common Room';
+            } elseif (str_starts_with($this->room_id, 'MAS-')) {
+                return 'Master Room';
+            }
+        }
 
-        return $roomNames[$this->room_id] ?? 'Unknown Room';
+        return 'Unknown Room';
     }
 
     public function getFormattedTimeAttribute(): string

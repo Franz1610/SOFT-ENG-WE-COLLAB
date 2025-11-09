@@ -74,14 +74,15 @@ class RoomManagementController extends Controller
         
         // Create room data with occupied/available/maintenance/reserved status
         $rooms = [];
-        $occupiedBookingIndex = 0; // Track which occupied booking to assign to which room
-        $upcomingBookingIndex = 0; // Track which upcoming booking to assign to which room
         
         for ($i = 1; $i <= $totalRooms; $i++) {
             $roomNumber = "Room {$i}";
             
             // Get the actual room number for this position
             $actualRoomNumber = $this->mapFrontendToActualRoomNumber($category, $roomNumber);
+            
+            // Map to the integer room_id that would be stored in the database
+            $roomIdInt = $this->mapRoomNumberToInteger($category, $actualRoomNumber);
             
             // Check if this room is in maintenance
             $maintenanceRoom = $maintenanceRooms->firstWhere('room_number', $actualRoomNumber);
@@ -90,46 +91,51 @@ class RoomManagementController extends Controller
                 $rooms[] = [
                     'number' => $roomNumber,
                     'status' => 'Maintenance',
-                    'capacity' => $this->getDefaultCapacity($category),
+                    'capacity' => $this->getDefaultCapacity($category, $roomNumber),
                     'guest' => null,
                     'timeRange' => null,
                     'booking_id' => null
                 ];
-            } elseif ($occupiedBookingIndex < $confirmedBookings->count()) {
-                // Assign currently active bookings to non-maintenance rooms
-                $booking = $confirmedBookings[$occupiedBookingIndex];
-                \Log::info("Room {$i} is currently occupied by booking ID: {$booking->id}");
-                $rooms[] = [
-                    'number' => $roomNumber,
-                    'status' => 'Occupied',
-                    'capacity' => $booking->pax,
-                    'guest' => $booking->first_name . ' ' . $booking->last_name,
-                    'timeRange' => $this->formatTimeRange($booking->start_time, $booking->end_time),
-                    'booking_id' => $booking->id
-                ];
-                $occupiedBookingIndex++;
-            } elseif ($upcomingBookingIndex < $upcomingBookings->count()) {
-                // Assign upcoming bookings to show as "Reserved"
-                $booking = $upcomingBookings[$upcomingBookingIndex];
-                \Log::info("Room {$i} is reserved for upcoming booking ID: {$booking->id}");
-                $rooms[] = [
-                    'number' => $roomNumber,
-                    'status' => 'Reserved',
-                    'capacity' => $booking->pax,
-                    'guest' => $booking->first_name . ' ' . $booking->last_name,
-                    'timeRange' => $this->formatTimeRange($booking->start_time, $booking->end_time),
-                    'booking_id' => $booking->id
-                ];
-                $upcomingBookingIndex++;
             } else {
-                $rooms[] = [
-                    'number' => $roomNumber,
-                    'status' => 'Available',
-                    'capacity' => $this->getDefaultCapacity($category),
-                    'guest' => null,
-                    'timeRange' => null,
-                    'booking_id' => null
-                ];
+                // Look for a currently active booking for this specific room
+                $activeBooking = $confirmedBookings->firstWhere('room_id', $roomIdInt);
+                
+                if ($activeBooking) {
+                    \Log::info("Room {$i} (ID: {$roomIdInt}) is currently occupied by booking ID: {$activeBooking->id}");
+                    $rooms[] = [
+                        'number' => $roomNumber,
+                        'status' => 'Occupied',
+                        'capacity' => $activeBooking->pax,
+                        'guest' => $activeBooking->first_name . ' ' . $activeBooking->last_name,
+                        'timeRange' => $this->formatTimeRange($activeBooking->start_time, $activeBooking->end_time),
+                        'booking_id' => $activeBooking->id
+                    ];
+                } else {
+                    // Look for an upcoming booking for this specific room
+                    $upcomingBooking = $upcomingBookings->firstWhere('room_id', $roomIdInt);
+                    
+                    if ($upcomingBooking) {
+                        \Log::info("Room {$i} (ID: {$roomIdInt}) is reserved for upcoming booking ID: {$upcomingBooking->id}");
+                        $rooms[] = [
+                            'number' => $roomNumber,
+                            'status' => 'Reserved',
+                            'capacity' => $upcomingBooking->pax,
+                            'guest' => $upcomingBooking->first_name . ' ' . $upcomingBooking->last_name,
+                            'timeRange' => $this->formatTimeRange($upcomingBooking->start_time, $upcomingBooking->end_time),
+                            'booking_id' => $upcomingBooking->id
+                        ];
+                    } else {
+                        // Room is available
+                        $rooms[] = [
+                            'number' => $roomNumber,
+                            'status' => 'Available',
+                            'capacity' => $this->getDefaultCapacity($category, $roomNumber),
+                            'guest' => null,
+                            'timeRange' => null,
+                            'booking_id' => null
+                        ];
+                    }
+                }
             }
         }
 
@@ -169,7 +175,7 @@ class RoomManagementController extends Controller
                 'id' => 2,
                 'name' => 'Common Room',
                 'category' => 'common',
-                'capacity' => '3-5 People',
+                'capacity' => '2-4 People',
                 'amenities' => ['Smart TV', 'WiFi', 'Video Conferencing', 'Whiteboard'],
                 'description' => 'Collaborative space ideal for small team meetings and discussions.'
             ],
@@ -232,12 +238,12 @@ class RoomManagementController extends Controller
         return Room::where('category', $category)->count() ?: 1;
     }
 
-    private function getDefaultCapacity($category)
+    private function getDefaultCapacity($category, $roomNumber = null)
     {
         $capacities = [
             'individual' => 1,
             'common' => 4,
-            'master' => 8
+            'master' => 10
         ];
 
         return $capacities[$category] ?? 1;
@@ -535,5 +541,328 @@ class RoomManagementController extends Controller
         
         // If not in "Room X" format or not found, return as-is
         return $frontendRoomNumber;
+    }
+
+    public function occupyRoom(Request $request)
+    {
+        $validated = $request->validate([
+            'category' => 'required|in:individual,master,common',
+            'room_number' => 'required|string',
+            'guest_name' => 'required|string|max:255',
+            'start_time' => 'required|string',
+            'end_time' => 'required|string'
+        ]);
+
+        try {
+            // Map frontend room number to actual database room number
+            $actualRoomNumber = $this->mapFrontendToActualRoomNumber($validated['category'], $validated['room_number']);
+            
+            // Get today's date
+            $today = Carbon::today()->toDateString();
+            
+            // Validate that the time is not in the past (on server side as well)
+            $now = Carbon::now();
+            $today = $now->toDateString();
+            
+            // Create Carbon instances for the selected times
+            $startDateTime = Carbon::createFromFormat('Y-m-d H:i', $today . ' ' . $validated['start_time']);
+            $endDateTime = Carbon::createFromFormat('Y-m-d H:i', $today . ' ' . $validated['end_time']);
+            
+            // Add 1 minute tolerance for walk-in bookings
+            $oneMinuteAgo = $now->copy()->subMinute();
+            
+            if ($startDateTime->lt($oneMinuteAgo)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Start time cannot be in the past.'
+                ], 400);
+            }
+            
+            if ($endDateTime->lt($now)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'End time cannot be in the past.'
+                ], 400);
+            }
+            
+            // Check if the room is already booked for the specified time
+            $roomIdInt = $this->mapRoomNumberToInteger($validated['category'], $actualRoomNumber);
+            
+            $conflictingBooking = Booking::where('category', $validated['category'])
+                ->where('room_id', $roomIdInt) // Use integer ID for conflict check
+                ->whereDate('booking_date', $today)
+                ->where('status', 'confirmed')
+                ->where(function ($query) use ($validated) {
+                    $query->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
+                          ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']])
+                          ->orWhere(function ($q) use ($validated) {
+                              $q->where('start_time', '<=', $validated['start_time'])
+                                ->where('end_time', '>=', $validated['end_time']);
+                          });
+                })
+                ->exists();
+
+            if ($conflictingBooking) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Room is already booked for the specified time.'
+                ], 400);
+            }
+
+            // Check if room is in maintenance
+            $room = Room::where('category', $validated['category'])
+                ->where('room_number', $actualRoomNumber)
+                ->first();
+
+            if ($room && $room->status === 'maintenance') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Room is currently under maintenance.'
+                ], 400);
+            }
+
+            // Create the walk-in booking
+            // Map actual room number to integer ID for database storage
+            $roomIdInt = $this->mapRoomNumberToInteger($validated['category'], $actualRoomNumber);
+            
+            $booking = Booking::create([
+                'user_id' => auth()->id(), // Admin who created the walk-in booking
+                'first_name' => $validated['guest_name'],
+                'last_name' => '', // Walk-in guests might not have last names
+                'contact' => '', // Walk-in bookings might not have contact info
+                'email' => '', // Walk-in bookings might not have email
+                'additional_info' => 'Walk-in booking created by admin',
+                'pax' => $this->getDefaultCapacity($validated['category']),
+                'category' => $validated['category'],
+                'room_id' => $roomIdInt, // Use integer ID
+                'booking_date' => $today,
+                'start_time' => $validated['start_time'],
+                'end_time' => $validated['end_time'],
+                'status' => 'confirmed', // Walk-in bookings are automatically confirmed
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Walk-in booking created successfully',
+                'booking_id' => $booking->id
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error creating walk-in booking: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create walk-in booking. Please try again.'
+            ], 500);
+        }
+    }
+
+    private function mapRoomNumberToInteger($category, $roomNumber)
+    {
+        // Create a consistent mapping from room number strings to integers
+        // Format: [category_prefix][room_number] → integer
+        // Examples: IND-01 → 1001, IND-02 → 1002, COM-01 → 2001, MAS-01 → 3001
+        
+        $categoryMap = [
+            'individual' => 1000,
+            'common' => 2000,
+            'master' => 3000
+        ];
+        
+        $baseId = $categoryMap[$category] ?? 1000;
+        
+        // Extract numeric part from room number (e.g., "IND-01" → "01" → 1)
+        if (preg_match('/\-(\d+)$/', $roomNumber, $matches)) {
+            $roomNum = (int)$matches[1];
+            return $baseId + $roomNum;
+        }
+        
+        // Fallback
+        return $baseId + 1;
+    }
+
+    public function extendRoom(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'category' => 'required|string|in:individual,common,master',
+                'room_number' => 'required|string',
+                'booking_id' => 'nullable|integer',
+                'new_end_time' => 'required|string'
+            ]);
+
+            // Find the booking to extend
+            $booking = null;
+            
+            if ($validated['booking_id']) {
+                // Use booking_id if provided (preferred method)
+                $booking = Booking::where('id', $validated['booking_id'])
+                    ->where('status', 'confirmed')
+                    ->first();
+            } else {
+                // Fallback: find by room and current time
+                $today = Carbon::today();
+                $roomIdInt = $this->mapRoomNumberToInteger($validated['category'], $validated['room_number']);
+                
+                $booking = Booking::where('room_id', $roomIdInt)
+                    ->where('booking_date', $today)
+                    ->where('status', 'confirmed')
+                    ->whereTime('start_time', '<=', now())
+                    ->whereTime('end_time', '>', now())
+                    ->first();
+            }
+
+            if (!$booking) {
+                \Log::error('No booking found for extend request', [
+                    'booking_id' => $validated['booking_id'],
+                    'category' => $validated['category'],
+                    'room_number' => $validated['room_number']
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active booking found for this room.'
+                ], 404);
+            }
+
+            // Validate that new end time is later than current end time
+            $currentEndTime = Carbon::parse($booking->end_time);
+            $newEndTime = Carbon::parse($validated['new_end_time']);
+            
+            if ($newEndTime <= $currentEndTime) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'New end time must be later than the current end time.'
+                ], 400);
+            }
+
+            // Check for conflicts with other bookings on the same room
+            $today = Carbon::parse($booking->booking_date);
+            $conflicts = Booking::where('room_id', $booking->room_id)
+                ->where('booking_date', $today)
+                ->where('status', 'confirmed')
+                ->where('id', '!=', $booking->id) // Exclude current booking
+                ->where(function($query) use ($currentEndTime, $newEndTime) {
+                    $query->whereBetween('start_time', [$currentEndTime, $newEndTime])
+                        ->orWhereBetween('end_time', [$currentEndTime, $newEndTime])
+                        ->orWhere(function($q) use ($currentEndTime, $newEndTime) {
+                            $q->where('start_time', '<=', $currentEndTime)
+                              ->where('end_time', '>=', $newEndTime);
+                        });
+                })
+                ->exists();
+
+            if ($conflicts) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot extend booking due to conflicts with other bookings during the requested time.'
+                ], 400);
+            }
+
+            // Update the booking end time
+            $booking->update([
+                'end_time' => $validated['new_end_time']
+            ]);
+
+            \Log::info('Booking extended successfully', [
+                'booking_id' => $booking->id,
+                'old_end_time' => $currentEndTime->format('H:i'),
+                'new_end_time' => $validated['new_end_time']
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Booking extended successfully',
+                'new_end_time' => $validated['new_end_time']
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error extending booking: ' . $e->getMessage(), [
+                'request_data' => $request->all()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to extend booking. Please try again.'
+            ], 500);
+        }
+    }
+
+    public function stopRoom(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'category' => 'required|string|in:individual,common,master',
+                'room_number' => 'required|string',
+                'booking_id' => 'required|integer'
+            ]);
+
+            // Find the booking to stop/cancel
+            $booking = Booking::where('id', $validated['booking_id'])
+                ->where('status', 'confirmed')
+                ->first();
+
+            if (!$booking) {
+                \Log::error('No confirmed booking found for stop request', [
+                    'booking_id' => $validated['booking_id'],
+                    'category' => $validated['category'],
+                    'room_number' => $validated['room_number']
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active booking found for this room.'
+                ], 404);
+            }
+
+            // Check if the booking is currently active (started but not ended)
+            $now = Carbon::now();
+            $bookingDate = Carbon::parse($booking->booking_date);
+            $startTime = Carbon::parse($booking->start_time);
+            $endTime = Carbon::parse($booking->end_time);
+            
+            // Create full datetime objects for comparison
+            $bookingStart = $bookingDate->copy()->setTimeFromTimeString($startTime->format('H:i:s'));
+            $bookingEnd = $bookingDate->copy()->setTimeFromTimeString($endTime->format('H:i:s'));
+
+            if ($now < $bookingStart) {
+                // Future booking - can be canceled
+                $statusMessage = 'Future booking has been canceled';
+            } elseif ($now >= $bookingStart && $now <= $bookingEnd) {
+                // Currently active booking - can be stopped
+                $statusMessage = 'Active booking has been stopped and canceled';
+            } else {
+                // Past booking - shouldn't happen but handle gracefully
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This booking has already ended and cannot be stopped.'
+                ], 400);
+            }
+
+            // Update the booking status to canceled
+            $booking->update([
+                'status' => 'cancelled'
+            ]);
+
+            \Log::info('Booking stopped/canceled successfully', [
+                'booking_id' => $booking->id,
+                'room_id' => $booking->room_id,
+                'guest' => $booking->first_name . ' ' . $booking->last_name,
+                'original_time_range' => $booking->start_time . ' - ' . $booking->end_time,
+                'canceled_at' => $now->toDateTimeString()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $statusMessage
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error stopping booking: ' . $e->getMessage(), [
+                'request_data' => $request->all()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to stop booking. Please try again.'
+            ], 500);
+        }
     }
 }

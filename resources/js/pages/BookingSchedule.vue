@@ -70,7 +70,7 @@
                   type="number" 
                   min="01" 
                   max="12" 
-                  placeholder="01"
+                  placeholder="00"
                   class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
                   @input="formatTimeInput($event, 'startTime', 'hour')"
                 />
@@ -105,7 +105,7 @@
                   type="number" 
                   min="01" 
                   max="12" 
-                  placeholder="01"
+                  placeholder="00"
                   class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
                   @input="formatTimeInput($event, 'endTime', 'hour')"
                 />
@@ -404,48 +404,9 @@ onMounted(() => {
       form.value.date = todayManila;
     }
 
-    // Only set default times if empty
-    const startEmpty = !form.value.startTime.hour || !form.value.startTime.minute;
-    const endEmpty = !form.value.endTime.hour || !form.value.endTime.minute;
-    if (startEmpty && endEmpty) {
-      const now = new Date();
-      const manilaString24 = now.toLocaleString('en-US', {
-        timeZone: 'Asia/Manila',
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      const [h, m] = manilaString24.split(':').map(Number);
-      // Minimum = now + 60 minutes
-      let mins = h * 60 + m + 60;
-      // Round up to nearest 5 minutes for nicer UX
-      const round = 5;
-      mins = Math.ceil(mins / round) * round;
-      const startHour24 = Math.floor(mins / 60) % 24;
-      const startMin = mins % 60;
-      const startPeriod = startHour24 >= 12 ? 'PM' : 'AM';
-      let startHour12 = startHour24 % 12;
-      if (startHour12 === 0) startHour12 = 12;
-
-      // End time = start + 60 minutes
-      let endMins = mins + 60;
-      const endHour24 = Math.floor(endMins / 60) % 24;
-      const endMin = endMins % 60;
-      const endPeriod = endHour24 >= 12 ? 'PM' : 'AM';
-      let endHour12 = endHour24 % 12;
-      if (endHour12 === 0) endHour12 = 12;
-
-      form.value.startTime = {
-        hour: String(startHour12).padStart(2, '0'),
-        minute: String(startMin).padStart(2, '0'),
-        period: startPeriod
-      };
-      form.value.endTime = {
-        hour: String(endHour12).padStart(2, '0'),
-        minute: String(endMin).padStart(2, '0'),
-        period: endPeriod
-      };
-    }
+    // REMOVED: Auto-filling of start and end times
+    // Users must now manually select their preferred times
+    
   } catch (e) {
     // Non-fatal: ignore and let user choose manually
   }

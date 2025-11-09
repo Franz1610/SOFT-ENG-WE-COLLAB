@@ -46,21 +46,50 @@ const showAddRoomModal = ref(false);
 const showDeleteConfirmModal = ref(false);
 const showDeleteSuccessModal = ref(false);
 const showAddSuccessModal = ref(false);
+const showOccupyModal = ref(false);
+const showExtendModal = ref(false);
+const showStopConfirmModal = ref(false);
+const showOccupySuccessModal = ref(false);
+const showExtendSuccessModal = ref(false);
+const showStopSuccessModal = ref(false);
+const showPastTimeErrorModal = ref(false);
 const selectedCategory = ref<RoomCategory | null>(null);
 const roomToDelete = ref<IndividualRoom | null>(null);
+const roomToOccupy = ref<IndividualRoom | null>(null);
+const roomToExtend = ref<IndividualRoom | null>(null);
+const roomToStop = ref<IndividualRoom | null>(null);
 const deletedRoomInfo = ref<{number: string, category: string} | null>(null);
 const addedRoomInfo = ref<{numberOfRooms: number, category: string} | null>(null);
+const occupySuccessInfo = ref<{roomNumber: string, guestName: string, timeRange: string} | null>(null);
+const extendSuccessInfo = ref<{roomNumber: string, newEndTime: string} | null>(null);
+const stopSuccessInfo = ref<{roomNumber: string, guestName: string} | null>(null);
+const pastTimeErrorMessage = ref('');
 const individualRooms = ref<IndividualRoom[]>([]);
 const editableRooms = ref<IndividualRoom[]>([]);
 const loading = ref(false);
 const editLoading = ref(false);
 const addRoomLoading = ref(false);
 const deleteLoading = ref(false);
+const occupyLoading = ref(false);
+const extendLoading = ref(false);
+const stopLoading = ref(false);
 
 // Add room form data
 const addRoomForm = ref({
     category: '',
     numberOfRooms: 1
+});
+
+// Occupy room form data
+const occupyForm = ref({
+    guestName: '',
+    startTime: '',
+    endTime: ''
+});
+
+// Extend room form data
+const extendForm = ref({
+    newEndTime: ''
 });
 
 // Use the room categories from props instead of mock data
@@ -308,6 +337,255 @@ const confirmDeleteRoom = async () => {
         roomToDelete.value = null;
     }
 };
+
+// Occupy room function for walk-in functionality
+const occupyRoom = async (room: IndividualRoom) => {
+    roomToOccupy.value = room;
+    
+    // Reset form without pre-filled times
+    occupyForm.value = {
+        guestName: '',
+        startTime: '',
+        endTime: ''
+    };
+    
+    showOccupyModal.value = true;
+};
+
+// Submit occupy room form
+const submitOccupyRoom = async () => {
+    if (!occupyForm.value.guestName.trim() || !occupyForm.value.startTime || !occupyForm.value.endTime) {
+        pastTimeErrorMessage.value = 'Please fill in all fields.';
+        showPastTimeErrorModal.value = true;
+        return;
+    }
+    
+    if (occupyForm.value.startTime >= occupyForm.value.endTime) {
+        pastTimeErrorMessage.value = 'End time must be after start time.';
+        showPastTimeErrorModal.value = true;
+        return;
+    }
+    
+    // Simplified time validation - just compare time strings with current time
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    // Convert start time to minutes
+    const [startHour, startMinute] = occupyForm.value.startTime.split(':').map(Number);
+    const startTimeInMinutes = startHour * 60 + startMinute;
+    
+    // Convert end time to minutes  
+    const [endHour, endMinute] = occupyForm.value.endTime.split(':').map(Number);
+    const endTimeInMinutes = endHour * 60 + endMinute;
+    
+    // Allow some tolerance (5 minutes) for walk-in bookings
+    const toleranceMinutes = 5;
+    
+    if (startTimeInMinutes < (currentTimeInMinutes - toleranceMinutes)) {
+        pastTimeErrorMessage.value = 'Start time cannot be in the past. Please select a current or future time.';
+        showPastTimeErrorModal.value = true;
+        return;
+    }
+    
+    if (endTimeInMinutes < currentTimeInMinutes) {
+        pastTimeErrorMessage.value = 'End time cannot be in the past. Please select a current or future time.';
+        showPastTimeErrorModal.value = true;
+        return;
+    }
+    
+    occupyLoading.value = true;
+    
+    try {
+        // Call the actual backend API to create walk-in booking
+        const response = await axios.post('/admin/rooms/occupy', {
+            category: selectedCategory.value?.category,
+            room_number: roomToOccupy.value?.number,
+            guest_name: occupyForm.value.guestName,
+            start_time: occupyForm.value.startTime,
+            end_time: occupyForm.value.endTime
+        });
+        
+        if (response.data.success) {
+            // Store success info for modal
+            occupySuccessInfo.value = {
+                roomNumber: roomToOccupy.value?.number || '',
+                guestName: occupyForm.value.guestName,
+                timeRange: `${occupyForm.value.startTime} - ${occupyForm.value.endTime}`
+            };
+            
+            // Close modal and refresh data
+            showOccupyModal.value = false;
+            
+            // Refresh room data after occupying
+            individualRooms.value = await fetchIndividualRooms(selectedCategory.value!);
+            router.reload({ only: ['roomCategories'] });
+            
+            // Show success modal
+            showOccupySuccessModal.value = true;
+        } else {
+            pastTimeErrorMessage.value = response.data.message || 'Failed to occupy room.';
+            showPastTimeErrorModal.value = true;
+        }
+        
+    } catch (error: any) {
+        console.error('Error occupying room:', error);
+        let errorMessage = 'Failed to occupy room. Please try again.';
+        
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response?.status === 400) {
+            errorMessage = error.response.data.message || 'Invalid booking data or time conflict.';
+        }
+        
+        pastTimeErrorMessage.value = errorMessage;
+        showPastTimeErrorModal.value = true;
+    } finally {
+        occupyLoading.value = false;
+    }
+};
+
+// Extend room function
+const extendRoom = async (room: IndividualRoom) => {
+    roomToExtend.value = room;
+    
+    // Reset form - we'll pre-fill with current end time for convenience
+    extendForm.value = {
+        newEndTime: ''
+    };
+    
+    showExtendModal.value = true;
+};
+
+// Submit extend room form
+const submitExtendRoom = async () => {
+    if (!extendForm.value.newEndTime) {
+        pastTimeErrorMessage.value = 'Please select a new end time.';
+        showPastTimeErrorModal.value = true;
+        return;
+    }
+    
+    // Basic validation - ensure booking_id exists
+    if (!roomToExtend.value?.booking_id) {
+        pastTimeErrorMessage.value = 'Unable to find booking information for this room.';
+        showPastTimeErrorModal.value = true;
+        return;
+    }
+    
+    extendLoading.value = true;
+    
+    try {
+        // Call the backend API to extend the booking
+        const response = await axios.post('/admin/rooms/extend', {
+            category: selectedCategory.value?.category,
+            room_number: roomToExtend.value?.number,
+            booking_id: roomToExtend.value?.booking_id,
+            new_end_time: extendForm.value.newEndTime
+        });
+        
+        if (response.data.success) {
+            // Store success info for modal
+            extendSuccessInfo.value = {
+                roomNumber: roomToExtend.value?.number || '',
+                newEndTime: extendForm.value.newEndTime
+            };
+            
+            // Close modal and refresh data
+            showExtendModal.value = false;
+            
+            // Refresh room data after extending
+            individualRooms.value = await fetchIndividualRooms(selectedCategory.value!);
+            router.reload({ only: ['roomCategories'] });
+            
+            // Show success modal
+            showExtendSuccessModal.value = true;
+        } else {
+            pastTimeErrorMessage.value = response.data.message || 'Failed to extend booking.';
+            showPastTimeErrorModal.value = true;
+        }
+        
+    } catch (error: any) {
+        console.error('Error extending booking:', error);
+        let errorMessage = 'Failed to extend booking. Please try again.';
+        
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response?.status === 400) {
+            errorMessage = error.response.data.message || 'Invalid time or booking conflict.';
+        } else if (error.response?.status === 404) {
+            errorMessage = 'Booking not found. Please refresh and try again.';
+        }
+        
+        pastTimeErrorMessage.value = errorMessage;
+        showPastTimeErrorModal.value = true;
+    } finally {
+        extendLoading.value = false;
+    }
+};
+
+// Stop room function
+const stopRoom = async (room: IndividualRoom) => {
+    // Check if booking_id exists
+    if (!room.booking_id) {
+        alert('Unable to find booking information for this room.');
+        return;
+    }
+    
+    roomToStop.value = room;
+    showStopConfirmModal.value = true;
+};
+
+// Confirm stop room
+const confirmStopRoom = async () => {
+    if (!roomToStop.value) return;
+    
+    stopLoading.value = true;
+    
+    try {
+        // Call the backend API to stop/cancel the booking
+        const response = await axios.post('/admin/rooms/stop', {
+            category: selectedCategory.value?.category,
+            room_number: roomToStop.value.number,
+            booking_id: roomToStop.value.booking_id
+        });
+        
+        if (response.data.success) {
+            // Store success info for modal
+            stopSuccessInfo.value = {
+                roomNumber: roomToStop.value.number,
+                guestName: roomToStop.value.guest || 'Unknown Guest'
+            };
+            
+            // Close confirmation modal
+            showStopConfirmModal.value = false;
+            
+            // Refresh room data after stopping
+            individualRooms.value = await fetchIndividualRooms(selectedCategory.value!);
+            router.reload({ only: ['roomCategories'] });
+            
+            // Show success modal
+            showStopSuccessModal.value = true;
+        } else {
+            alert(response.data.message || 'Failed to stop booking.');
+        }
+        
+    } catch (error: any) {
+        console.error('Error stopping booking:', error);
+        let errorMessage = 'Failed to stop booking. Please try again.';
+        
+        if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+        } else if (error.response?.status === 404) {
+            errorMessage = 'Booking not found. Please refresh and try again.';
+        }
+        
+        alert(errorMessage);
+    } finally {
+        stopLoading.value = false;
+        roomToStop.value = null;
+    }
+};
 </script>
 
 <template>
@@ -513,6 +791,42 @@ const confirmDeleteRoom = async () => {
                                 <div v-if="room.timeRange" class="flex items-center text-sm text-[#344C34]">
                                     <Clock class="w-4 h-4 mr-2 text-[#4b824b]" />
                                     {{ room.timeRange }}
+                                </div>
+                                
+                                <!-- Occupy Button for Available Rooms -->
+                                <div v-if="room.status === 'Available'" class="pt-2">
+                                    <Button 
+                                        @click="occupyRoom(room)"
+                                        variant="outline"
+                                        class="w-full border-orange-500 text-orange-600 hover:bg-orange-500 hover:text-white"
+                                        size="sm"
+                                    >
+                                        Occupy
+                                    </Button>
+                                </div>
+                                
+                                <!-- Extend and Stop Buttons for Occupied Rooms -->
+                                <div v-if="room.status === 'Occupied'" class="pt-2 space-y-2">
+                                    <Button 
+                                        @click="extendRoom(room)"
+                                        variant="outline"
+                                        class="w-full border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white transition-all duration-200"
+                                        size="sm"
+                                        :disabled="extendLoading"
+                                    >
+                                        <div v-if="extendLoading" class="w-4 h-4 mr-2 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                        {{ extendLoading ? 'Extending...' : 'Extend' }}
+                                    </Button>
+                                    <Button 
+                                        @click="stopRoom(room)"
+                                        variant="outline"
+                                        class="w-full border-red-500 text-red-600 hover:bg-red-500 hover:text-white transition-all duration-200"
+                                        size="sm"
+                                        :disabled="stopLoading"
+                                    >
+                                        <div v-if="stopLoading" class="w-4 h-4 mr-2 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                                        {{ stopLoading ? 'Stopping...' : 'Stop' }}
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -843,6 +1157,469 @@ const confirmDeleteRoom = async () => {
                             @click="showAddSuccessModal = false"
                         >
                             OK
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Occupy Room Modal -->
+        <Dialog v-model:open="showOccupyModal">
+            <DialogContent class="max-w-md bg-[#FFFAE9] border-2 border-orange-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-orange-600">
+                        <User class="w-5 h-5 inline mr-2" />
+                        Walk-in Booking
+                    </DialogTitle>
+                    <DialogDescription class="text-[#344C34]">
+                        Register a walk-in guest for room {{ roomToOccupy?.number }}
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="space-y-4 mt-4">
+                    <!-- Room Info -->
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-orange-800">Room:</span>
+                            <span class="text-sm font-bold text-orange-900">{{ roomToOccupy?.number }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-sm font-medium text-orange-800">Category:</span>
+                            <span class="text-sm text-orange-900">{{ selectedCategory?.name }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-sm font-medium text-orange-800">Capacity:</span>
+                            <span class="text-sm text-orange-900">{{ roomToOccupy?.capacity }} people</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Guest Name -->
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-2">
+                            Guest Name *
+                        </label>
+                        <input 
+                            v-model="occupyForm.guestName" 
+                            type="text" 
+                            class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            placeholder="Enter guest name"
+                        />
+                    </div>
+                    
+                    <!-- Time Selection -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-[#4b824b] mb-2">
+                                Start Time *
+                            </label>
+                            <input 
+                                v-model="occupyForm.startTime" 
+                                type="time" 
+                                placeholder="00:00"
+                                class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-[#4b824b] mb-2">
+                                End Time *
+                            </label>
+                            <input 
+                                v-model="occupyForm.endTime" 
+                                type="time" 
+                                placeholder="00:00"
+                                class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b] focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+                    
+                    <!-- Walk-in Note -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <p class="text-blue-700 font-medium text-sm">Walk-in Booking</p>
+                                <p class="text-blue-600 text-xs mt-1">
+                                    This booking has no advance time restrictions and can start immediately.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2 justify-end mt-6">
+                        <Button 
+                            variant="outline" 
+                            class="border-[#4b824b] text-[#4b824b] hover:bg-[#4b824b] hover:text-[#FFFAE9]"
+                            @click="showOccupyModal = false"
+                            :disabled="occupyLoading"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            class="bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                            @click="submitOccupyRoom"
+                            :disabled="occupyLoading || !occupyForm.guestName.trim() || !occupyForm.startTime || !occupyForm.endTime"
+                        >
+                            <User class="w-4 h-4 mr-2" v-if="!occupyLoading" />
+                            <div class="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" v-else></div>
+                            {{ occupyLoading ? 'Booking...' : 'Occupy Room' }}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Extend Room Modal -->
+        <Dialog v-model:open="showExtendModal">
+            <DialogContent class="max-w-md bg-[#FFFAE9] border-2 border-blue-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-blue-600">
+                        <Clock class="w-5 h-5 inline mr-2" />
+                        Extend Booking
+                    </DialogTitle>
+                    <DialogDescription class="text-[#344C34]">
+                        Extend the end time for room {{ roomToExtend?.number }}
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="space-y-4 mt-4">
+                    <!-- Room Info -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-blue-800">Room:</span>
+                            <span class="text-sm font-bold text-blue-900">{{ roomToExtend?.number }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-sm font-medium text-blue-800">Guest:</span>
+                            <span class="text-sm text-blue-900">{{ roomToExtend?.guest }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-sm font-medium text-blue-800">Current Time:</span>
+                            <span class="text-sm text-blue-900">{{ roomToExtend?.timeRange }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-sm font-medium text-blue-800">Booking ID:</span>
+                            <span class="text-sm text-blue-900">{{ roomToExtend?.booking_id || 'N/A' }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-1">
+                            <span class="text-sm font-medium text-blue-800">Capacity:</span>
+                            <span class="text-sm text-blue-900">{{ roomToExtend?.capacity }} people</span>
+                        </div>
+                    </div>
+                    
+                    <!-- New End Time -->
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-2">
+                            New End Time *
+                        </label>
+                        <input 
+                            v-model="extendForm.newEndTime" 
+                            type="time" 
+                            class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b] focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Select new end time"
+                        />
+                    </div>
+                    
+                    <!-- Extend Note -->
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <p class="text-green-700 font-medium text-sm">Extend Booking</p>
+                                <p class="text-green-600 text-xs mt-1">
+                                    The new end time must be later than the current end time. The booking will be updated in the system.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2 justify-end mt-6">
+                        <Button 
+                            variant="outline" 
+                            class="border-[#4b824b] text-[#4b824b] hover:bg-[#4b824b] hover:text-[#FFFAE9]"
+                            @click="showExtendModal = false"
+                            :disabled="extendLoading"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            class="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                            @click="submitExtendRoom"
+                            :disabled="extendLoading || !extendForm.newEndTime"
+                        >
+                            <Clock class="w-4 h-4 mr-2" v-if="!extendLoading" />
+                            <div class="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" v-else></div>
+                            {{ extendLoading ? 'Extending...' : 'Extend Booking' }}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Stop Confirmation Modal -->
+        <Dialog v-model:open="showStopConfirmModal">
+            <DialogContent class="max-w-md bg-[#FFFAE9] border-2 border-red-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-red-600 flex items-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                        Stop Booking
+                    </DialogTitle>
+                    <DialogDescription class="text-[#344C34] mt-2">
+                        This action will cancel the current booking and make the room available.
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            <span class="text-red-700 font-medium">Warning</span>
+                        </div>
+                        <p class="text-red-600 mt-2">
+                            You are about to stop the current booking for 
+                            <span class="font-semibold">{{ roomToStop?.number }}</span>.
+                        </p>
+                    </div>
+                    
+                    <div v-if="roomToStop" class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                        <h4 class="font-medium text-[#4b824b] mb-2">Booking Details:</h4>
+                        <div class="space-y-1 text-sm text-[#344C34]">
+                            <div class="flex justify-between">
+                                <span>Room:</span>
+                                <span class="font-medium">{{ roomToStop.number }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Guest:</span>
+                                <span class="font-medium">{{ roomToStop.guest }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Time:</span>
+                                <span class="font-medium">{{ roomToStop.timeRange }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Status:</span>
+                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                                    Will be Cancelled
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3 justify-end mt-6">
+                        <Button 
+                            variant="outline" 
+                            class="border-gray-300 text-gray-700 hover:bg-gray-50"
+                            @click="showStopConfirmModal = false"
+                            :disabled="stopLoading"
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            class="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                            @click="confirmStopRoom"
+                            :disabled="stopLoading"
+                        >
+                            <svg class="w-4 h-4 mr-2" v-if="!stopLoading" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10l2 2 4-4"></path>
+                            </svg>
+                            <div class="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" v-else></div>
+                            {{ stopLoading ? 'Stopping...' : 'Stop Booking' }}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Occupy Success Modal -->
+        <Dialog v-model:open="showOccupySuccessModal">
+            <DialogContent class="max-w-sm bg-[#FFFAE9] border-2 border-green-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-green-600 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Walk-in Booking Successful
+                    </DialogTitle>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-green-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <p class="text-green-700 font-medium">
+                                {{ occupySuccessInfo?.roomNumber }} has been successfully occupied!
+                            </p>
+                            <div class="mt-3 text-sm text-green-600">
+                                <div><strong>Guest:</strong> {{ occupySuccessInfo?.guestName }}</div>
+                                <div><strong>Time:</strong> {{ occupySuccessInfo?.timeRange }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex justify-center mt-6">
+                        <Button 
+                            class="bg-green-600 hover:bg-green-700 text-white border-green-600 px-6"
+                            @click="showOccupySuccessModal = false"
+                        >
+                            OK
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Extend Success Modal -->
+        <Dialog v-model:open="showExtendSuccessModal">
+            <DialogContent class="max-w-sm bg-[#FFFAE9] border-2 border-blue-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-blue-600 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Booking Extended Successfully
+                    </DialogTitle>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-blue-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="text-blue-700 font-medium">
+                                {{ extendSuccessInfo?.roomNumber }} booking has been extended!
+                            </p>
+                            <div class="mt-3 text-sm text-blue-600">
+                                <div><strong>New End Time:</strong> {{ extendSuccessInfo?.newEndTime }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex justify-center mt-6">
+                        <Button 
+                            class="bg-blue-600 hover:bg-blue-700 text-white border-blue-600 px-6"
+                            @click="showExtendSuccessModal = false"
+                        >
+                            OK
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Stop Success Modal -->
+        <Dialog v-model:open="showStopSuccessModal">
+            <DialogContent class="max-w-sm bg-[#FFFAE9] border-2 border-green-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-green-600 flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Booking Stopped Successfully
+                    </DialogTitle>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 text-green-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10l2 2 4-4"></path>
+                            </svg>
+                            <p class="text-green-700 font-medium">
+                                {{ stopSuccessInfo?.roomNumber }} booking has been stopped and cancelled!
+                            </p>
+                            <div class="mt-3 text-sm text-green-600">
+                                <div><strong>Guest:</strong> {{ stopSuccessInfo?.guestName }}</div>
+                                <div><strong>Status:</strong> Cancelled</div>
+                                <div><strong>Room Status:</strong> Now Available</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex justify-center mt-6">
+                        <Button 
+                            class="bg-green-600 hover:bg-green-700 text-white border-green-600 px-6"
+                            @click="showStopSuccessModal = false"
+                        >
+                            OK
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Past Time Error Modal -->
+        <Dialog v-model:open="showPastTimeErrorModal">
+            <DialogContent class="max-w-md bg-[#FFFAE9] border-2 border-red-500">
+                <DialogHeader>
+                    <DialogTitle class="text-xl font-bold text-red-600 flex items-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Invalid Time Selection
+                    </DialogTitle>
+                    <DialogDescription class="text-[#344C34] mt-2">
+                        Please correct the time selection to proceed with the walk-in booking.
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div class="mt-4">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-red-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                            <div>
+                                <p class="text-red-700 font-medium text-sm">Time Validation Error</p>
+                                <p class="text-red-600 text-sm mt-1">
+                                    {{ pastTimeErrorMessage }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Time Info -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-blue-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <p class="text-blue-700 font-medium text-sm">Current Time</p>
+                                <p class="text-blue-600 text-sm">
+                                    {{ new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Button -->
+                    <div class="flex justify-center mt-6">
+                        <Button 
+                            class="bg-red-600 hover:bg-red-700 text-white border-red-600 px-6"
+                            @click="showPastTimeErrorModal = false"
+                        >
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            Fix Time Selection
                         </Button>
                     </div>
                 </div>

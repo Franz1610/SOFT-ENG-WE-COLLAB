@@ -26,17 +26,19 @@ const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.locati
 </script>
 
 <template>
-    <div class="px-4 py-6">
-        <Heading title="Settings" description="Manage your profile and account settings" />
+    <div class="settings-container">
+        <div class="settings-header">
+            <Heading title="Settings" description="Manage your profile and account settings" />
+        </div>
 
-        <div class="flex flex-col lg:flex-row lg:space-x-12">
-            <aside class="w-full max-w-xl lg:w-48">
-                <nav class="flex flex-col space-y-1 space-x-0">
+        <div class="settings-content">
+            <aside class="settings-sidebar">
+                <nav class="sidebar-nav">
                     <Button
                         v-for="item in sidebarNavItems"
                         :key="item.href"
                         variant="ghost"
-                        :class="['w-full justify-start', { 'bg-muted': currentPath === item.href }]"
+                        :class="['nav-button', { 'nav-active': currentPath === item.href }]"
                         as-child
                     >
                         <Link :href="item.href">
@@ -46,13 +48,100 @@ const currentPath = page.props.ziggy?.location ? new URL(page.props.ziggy.locati
                 </nav>
             </aside>
 
-            <Separator class="my-6 lg:hidden" />
+            <Separator class="settings-separator" />
 
-            <div class="flex-1 md:max-w-2xl">
-                <section class="max-w-xl space-y-12">
+            <div class="settings-main">
+                <section class="settings-section">
                     <slot />
                 </section>
             </div>
         </div>
     </div>
 </template>
+
+<style scoped>
+.settings-container {
+    background: #FFFAE9;
+    min-height: 100vh;
+    padding: 1.5rem;
+}
+
+.settings-header {
+    margin-bottom: 2rem;
+}
+
+.settings-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.settings-sidebar {
+    width: 100%;
+    max-width: 20rem;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.nav-button {
+    width: 100%;
+    justify-content: flex-start;
+    color: #4b824b;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.nav-button:hover {
+    background: rgba(75, 130, 75, 0.1);
+    border-color: #4b824b;
+}
+
+.nav-active {
+    color: #FFFAE9 !important;
+    background: #4b824b !important;
+    border-color: #4b824b !important;
+}
+
+.settings-separator {
+    background-color: #4b824b;
+    height: 2px;
+    margin: 1.5rem 0;
+}
+
+.settings-main {
+    flex: 1;
+    max-width: 42rem;
+}
+
+.settings-section {
+    background: white;
+    border: 2px solid #4b824b;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 4px 12px rgba(75, 130, 75, 0.1);
+}
+
+@media (min-width: 1024px) {
+    .settings-content {
+        flex-direction: row;
+        gap: 3rem;
+    }
+    
+    .settings-sidebar {
+        width: 12rem;
+        max-width: none;
+    }
+    
+    .settings-separator {
+        display: none;
+    }
+}
+</style>

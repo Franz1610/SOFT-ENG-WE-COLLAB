@@ -73,94 +73,389 @@ function closeProof() {
 </script>
 
 <template>
-  <div style="background: #232323; min-height: 100vh;">
-    <Head title="Manage Payments" />
-    <AppLayout>
-      <div class="p-4">
-        <h1 class="text-2xl font-bold mb-4 text-[#344C34]">Manage Payments</h1>
-        <div class="flex items-center gap-3 mb-4">
-          <input v-model="search" placeholder="Search by booking, name, email" class="border rounded px-3 py-2 w-80" />
-          <select v-model="filter" class="border rounded px-2 py-2">
-            <option value="pending">Pending</option>
-            <option value="verified">Verified</option>
-            <option value="unprocessed">Unprocessed</option>
-            <option value="all">All</option>
-          </select>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="min-w-full bg-white border">
-            <thead>
-              <tr class="bg-[#4b824b] text-white">
-                <th class="px-3 py-2 text-left">Booking</th>
-                <th class="px-3 py-2 text-left">Customer</th>
-                <th class="px-3 py-2 text-left">Amount</th>
-                <th class="px-3 py-2 text-left">Status</th>
-                <th class="px-3 py-2 text-left">Proof</th>
-                <th class="px-3 py-2 text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in rows" :key="p.id" class="border-b">
-                <td class="px-3 py-2">#{{ p.booking_id }}<div class="text-xs text-gray-500">{{ p.date }}</div></td>
-                <td class="px-3 py-2">
-                  <div class="font-medium">{{ p.customer }}</div>
-                  <div class="text-xs text-gray-500">{{ p.email }}</div>
-                </td>
-                <td class="px-3 py-2">₱{{ p.amount_received.toFixed(2) }}</td>
-                <td class="px-3 py-2">
-                  <div class="flex flex-col gap-1">
-                    <span :class="{
-                      'bg-yellow-100 text-yellow-800 px-2 py-1 rounded w-fit': p.status==='Pending Review',
-                      'bg-green-100 text-green-800 px-2 py-1 rounded w-fit': p.status==='Verified',
-                      'bg-gray-100 text-gray-800 px-2 py-1 rounded w-fit': p.status==='Unprocessed'
-                    }">{{ p.status }}</span>
-                    <span v-if="p.status==='Unprocessed' && (p as any).decline_reason" class="text-xs text-red-700">Declined: {{ (p as any).decline_reason }}</span>
-                  </div>
-                </td>
-                <td class="px-3 py-2">
-                  <button
-                    v-if="p.proof_url"
-                    type="button"
-                    class="text-blue-600 underline"
-                    @click="openProofById(p.id, `Booking #${p.booking_id} - Proof`)"
-                  >view</button>
-                  <span v-else class="text-gray-400">—</span>
-                </td>
-                <td class="px-3 py-2 flex gap-2">
-                  <Button class="bg-green-700 text-white" @click="accept(p.id)" :disabled="p.status==='Verified'">Accept</Button>
-                  <Button variant="outline" class="border-red-600 text-red-700" @click="decline(p.id)">Decline</Button>
-                </td>
-              </tr>
-              <tr v-if="rows.length===0">
-                <td colspan="6" class="text-center text-gray-500 py-6">No payments to show</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+  <Head title="Manage Payments" />
+  <AppLayout>
+    <div class="manage-payments-container">
+      <div class="page-header">
+        <h1 class="page-title">Manage Payments</h1>
+        <p class="page-subtitle">Review and process payment submissions</p>
       </div>
-    </AppLayout>
-  </div>
+      
+      <div class="filters-section">
+        <input 
+          v-model="search" 
+          placeholder="Search by booking, name, email" 
+          class="search-input"
+        />
+        <select 
+          v-model="filter" 
+          class="filter-select"
+        >
+          <option value="pending">Pending</option>
+          <option value="verified">Verified</option>
+          <option value="unprocessed">Unprocessed</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+
+      <div class="table-container">
+        <table class="payments-table">
+          <thead>
+            <tr class="table-header">
+              <th class="table-th">Booking</th>
+              <th class="table-th">Customer</th>
+              <th class="table-th">Amount</th>
+              <th class="table-th">Status</th>
+              <th class="table-th">Proof</th>
+              <th class="table-th">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in rows" :key="p.id" class="table-row">
+              <td class="table-td">
+                <div class="booking-info">
+                  <span class="booking-id">#{{ p.booking_id }}</span>
+                  <div class="booking-date">{{ p.date }}</div>
+                </div>
+              </td>
+              <td class="table-td">
+                <div class="customer-info">
+                  <div class="customer-name">{{ p.customer }}</div>
+                  <div class="customer-email">{{ p.email }}</div>
+                </div>
+              </td>
+              <td class="table-td">
+                <span class="amount">₱{{ p.amount_received.toFixed(2) }}</span>
+              </td>
+              <td class="table-td">
+                <div class="status-container">
+                  <span :class="{
+                    'status-badge status-pending': p.status==='Pending Review',
+                    'status-badge status-verified': p.status==='Verified',
+                    'status-badge status-unprocessed': p.status==='Unprocessed'
+                  }">{{ p.status }}</span>
+                  <span v-if="p.status==='Unprocessed' && (p as any).decline_reason" class="decline-reason">
+                    Declined: {{ (p as any).decline_reason }}
+                  </span>
+                </div>
+              </td>
+              <td class="table-td">
+                <button
+                  v-if="p.proof_url"
+                  type="button"
+                  class="proof-link"
+                  @click="openProofById(p.id, `Booking #${p.booking_id} - Proof`)"
+                >view</button>
+                <span v-else class="no-proof">—</span>
+              </td>
+              <td class="table-td">
+                <div class="action-buttons">
+                  <Button 
+                    class="accept-btn"
+                    @click="accept(p.id)" 
+                    :disabled="p.status==='Verified'"
+                  >Accept</Button>
+                  <Button 
+                    class="decline-btn"
+                    @click="decline(p.id)"
+                  >Decline</Button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="rows.length===0">
+              <td colspan="6" class="no-data">No payments to show</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </AppLayout>
 
   <!-- Proof Preview Modal -->
   <Dialog :open="showProof" @update:open="closeProof">
-    <DialogContent class="sm:max-w-3xl bg-white">
+    <DialogContent class="proof-modal">
       <DialogHeader>
-        <DialogTitle class="text-lg font-semibold">{{ proofTitle }}</DialogTitle>
-        <DialogDescription v-if="proofUrl" class="text-gray-600">Click the image to open in a new tab.</DialogDescription>
+        <DialogTitle class="modal-title">{{ proofTitle }}</DialogTitle>
+        <DialogDescription class="modal-description">Click the image to open in a new tab.</DialogDescription>
       </DialogHeader>
-      <div v-if="proofUrl" class="w-full max-h-[70vh] overflow-auto">
+      <div v-if="proofUrl" class="proof-content">
         <a :href="proofUrl" target="_blank" rel="noopener">
-          <img :src="proofUrl" alt="Payment Proof" class="w-full h-auto object-contain rounded border" />
+          <img :src="proofUrl" alt="Payment Proof" class="proof-image" />
         </a>
       </div>
-      <DialogFooter class="sm:justify-center">
-        <Button variant="outline" @click="closeProof">Close</Button>
+      <DialogFooter class="modal-footer">
+        <Button class="close-btn" @click="closeProof">Close</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
 
 <style scoped>
-/* keep styling aligned with app theme */
+.manage-payments-container {
+  background: #FFFAE9;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #4b824b;
+  margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+  color: #6b956b;
+  font-size: 1rem;
+}
+
+.filters-section {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  align-items: center;
+}
+
+.search-input, .filter-select {
+  padding: 0.75rem 1rem;
+  border: 2px solid #4b824b;
+  border-radius: 8px;
+  background: #FFFAE9;
+  color: #4b824b;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.search-input {
+  width: 320px;
+}
+
+.filter-select {
+  min-width: 140px;
+}
+
+.search-input:focus, .filter-select:focus {
+  outline: none;
+  border-color: #3d6b3d;
+  box-shadow: 0 0 0 3px rgba(75, 130, 75, 0.1);
+}
+
+.table-container {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(75, 130, 75, 0.1);
+  border: 2px solid #4b824b;
+}
+
+.payments-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-header {
+  background: #4b824b;
+  color: #FFFAE9;
+}
+
+.table-th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-row {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s ease;
+}
+
+.table-row:hover {
+  background: #f8f9fa;
+}
+
+.table-td {
+  padding: 1rem;
+  vertical-align: top;
+}
+
+.booking-info .booking-id {
+  font-weight: 600;
+  color: #4b824b;
+}
+
+.booking-date, .customer-email {
+  font-size: 0.875rem;
+  color: #6b956b;
+  margin-top: 0.25rem;
+}
+
+.customer-name {
+  font-weight: 500;
+  color: #4b824b;
+}
+
+.amount {
+  font-weight: 600;
+  color: #4b824b;
+  font-size: 1.125rem;
+}
+
+.status-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.status-verified {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+}
+
+.status-unprocessed {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #6b7280;
+}
+
+.decline-reason {
+  font-size: 0.75rem;
+  color: #dc2626;
+  font-style: italic;
+}
+
+.proof-link {
+  color: #4b824b;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.proof-link:hover {
+  color: #3d6b3d;
+}
+
+.no-proof {
+  color: #9ca3af;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.accept-btn {
+  background: #4b824b;
+  color: #FFFAE9;
+  border: 2px solid #4b824b;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.accept-btn:hover:not(:disabled) {
+  background: #3d6b3d;
+  border-color: #3d6b3d;
+}
+
+.accept-btn:disabled {
+  background: #9ca3af;
+  border-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.decline-btn {
+  background: transparent;
+  color: #dc2626;
+  border: 2px solid #dc2626;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.decline-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.no-data {
+  text-align: center;
+  padding: 3rem;
+  color: #6b956b;
+  font-style: italic;
+}
+
+/* Modal styles */
+.proof-modal {
+  background: #FFFAE9;
+  border: 2px solid #4b824b;
+}
+
+.modal-title {
+  color: #4b824b;
+  font-weight: 600;
+}
+
+.modal-description {
+  color: #6b956b;
+}
+
+.proof-content {
+  max-height: 70vh;
+  overflow: auto;
+  padding: 1rem 0;
+}
+
+.proof-image {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 2px solid #4b824b;
+}
+
+.modal-footer {
+  justify-content: center;
+}
+
+.close-btn {
+  background: transparent;
+  color: #4b824b;
+  border: 2px solid #4b824b;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #4b824b;
+  color: #FFFAE9;
+}
 </style>

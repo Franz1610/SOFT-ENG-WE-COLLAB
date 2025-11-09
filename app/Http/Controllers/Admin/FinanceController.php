@@ -97,12 +97,14 @@ class FinanceController extends Controller
         // Define categories
         $incomeCategories = ['Booking Payment', 'Additional Service', 'Other Income'];
         $expenseCategories = ['Maintenance', 'Utilities', 'Supplies', 'Staff Salary'];
+        $miscIncomeCategories = ['Ad-hoc Income']; // Categories specific to Misc. Income type
 
         return inertia('admin/Finance', [
             'transactions' => $filteredTransactions,
             'summary' => $summary,
             'incomeCategories' => $incomeCategories,
             'expenseCategories' => $expenseCategories,
+            'miscIncomeCategories' => $miscIncomeCategories,
         ]);
     }
 
@@ -162,7 +164,7 @@ class FinanceController extends Controller
         $request->validate([
             'date' => 'required|date',
             'description' => 'required|string|max:255',
-            'type' => 'required|in:income,expense',
+            'type' => 'required|in:income,expense,Misc. Income',
             'amount' => 'required|numeric|min:0',
             'category' => 'required|string',
             'payment_method' => 'required|string',
@@ -188,7 +190,7 @@ class FinanceController extends Controller
         $request->validate([
             'date' => 'required|date',
             'description' => 'required|string|max:255',
-            'type' => 'required|in:income,expense',
+            'type' => 'required|in:income,expense,Misc. Income',
             'amount' => 'required|numeric|min:0',
             'category' => 'required|string',
             'payment_method' => 'required|string',

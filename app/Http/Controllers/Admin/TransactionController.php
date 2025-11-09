@@ -48,7 +48,7 @@ class TransactionController extends Controller
         $request->validate([
             'date' => 'required|date',
             'description' => 'required|string',
-            'type' => 'required|in:income,expense',
+            'type' => 'required|in:income,expense,Misc. Income',
             'amount' => 'required|numeric|min:0',
             'category' => 'required|string',
             'reference' => 'nullable|string',
@@ -74,7 +74,7 @@ class TransactionController extends Controller
         $request->validate([
             'date' => 'required|date',
             'description' => 'required|string',
-            'type' => 'required|in:income,expense',
+            'type' => 'required|in:income,expense,Misc. Income',
             'amount' => 'required|numeric|min:0',
             'category' => 'required|string',
             'reference' => 'nullable|string',

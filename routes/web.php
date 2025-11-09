@@ -98,8 +98,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'id' => $booking->id,
                     'user' => [
                         'id' => $booking->user->id,
-                        'name' => $booking->user->name,
-                        'email' => $booking->user->email,
+                        'name' => $booking->additional_info === 'Walk-in booking created by admin' ? 'Walk In Guest' : $booking->user->name,
+                        'email' => $booking->additional_info === 'Walk-in booking created by admin' ? '' : $booking->user->email,
                     ],
                     'company_name' => $booking->company_name,
                     'room' => $booking->room_id,
@@ -110,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'formatted_time' => $booking->formatted_time,
                     'status' => $booking->status,
                     'created_at' => $booking->created_at->format('Y-m-d H:i:s'),
+                    'additional_info' => $booking->additional_info,
                 ];
             });
             
@@ -124,6 +125,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/admin/rooms/maintenance', [\App\Http\Controllers\RoomManagementController::class, 'updateMaintenanceStatus']);
         Route::post('/admin/rooms/add', [\App\Http\Controllers\RoomManagementController::class, 'addRooms']);
         Route::delete('/admin/rooms/delete', [\App\Http\Controllers\RoomManagementController::class, 'deleteRoom']);
+        Route::post('/admin/rooms/occupy', [\App\Http\Controllers\RoomManagementController::class, 'occupyRoom']);
+        Route::post('/admin/rooms/extend', [\App\Http\Controllers\RoomManagementController::class, 'extendRoom']);
+        Route::post('/admin/rooms/stop', [\App\Http\Controllers\RoomManagementController::class, 'stopRoom']);
         
     // Booking management - both admin and admin officer
         Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);
