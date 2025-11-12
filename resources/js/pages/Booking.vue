@@ -86,7 +86,15 @@
               </div>
               <div class="flex-1">
                 <Label for="email">Email</Label>
-                <Input id="email" v-model="form.email" type="email" autocomplete="email" required />
+                <Input 
+                  id="email" 
+                  v-model="form.email" 
+                  type="email" 
+                  autocomplete="email" 
+                  :readonly="isLoggedIn" 
+                  :disabled="isLoggedIn" 
+                  required 
+                />
               </div>
             </div>
             <div class="flex gap-3">
@@ -95,7 +103,7 @@
                 <Input id="additional" v-model="form.additional" />
               </div>
               <div class="flex-1">
-                <Label for="pax">No. of Pax</Label>
+                <Label for="pax">No. of People</Label>
                 <Input 
                   id="pax" 
                   v-model="form.pax" 
@@ -130,7 +138,9 @@
           <div v-for="room in rooms" :key="room.id" @click="canSelectRoom(room) && selectRoom(room.id)"
             :class="[
               'relative transition-all border-2 rounded-xl p-4 flex flex-col items-center',
-              selectedRoom === room.id ? 'border-green-700 bg-green-50' : 'border-neutral-200 bg-white',
+              selectedRoom === room.id 
+                ? 'border-green-700 bg-green-100 ring-2 ring-green-600 ring-offset-2 shadow-md scale-[1.01]'
+                : 'border-neutral-200 bg-white',
               canSelectRoom(room) ? 'cursor-pointer hover:border-green-600' : 'cursor-not-allowed opacity-60',
               roomsBlinking ? 'animate-pulse' : ''
             ]"
@@ -227,6 +237,7 @@ const props = defineProps<Props>();
 // Get authentication data from Inertia
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const isLoggedIn = computed(() => !!user.value);
 
 // Modal state
 const showLogoutModal = ref(false);
@@ -247,10 +258,10 @@ const form = ref({
 const rooms = ref([
   {
     id: 1,
-    name: 'INDIV ROOM',
+    name: 'PHONE BOOTH ROOMS',
     image: '/images/booking/indiv_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '1-2 PAX ONLY',
+    capacity: '1 PAX ONLY',
     category: 'individual',
     totalRooms: 12,
     availableRooms: 0,
@@ -259,10 +270,10 @@ const rooms = ref([
   },
   {
     id: 3,
-    name: 'COMMON ROOM',
+    name: 'REGULAR TABLES',
     image: '/images/booking/common_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '3-4 PAX ONLY',
+    capacity: '1-4 PAX ONLY',
     category: 'common',
     totalRooms: 5,
     availableRooms: 0,
@@ -271,10 +282,10 @@ const rooms = ref([
   },
   {
     id: 2,
-    name: 'MASTER ROOM',
+    name: 'CONFERENCE ROOMS',
     image: '/images/booking/master_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '5-10 PAX ONLY',
+    capacity: '1-10 PAX ONLY',
     category: 'master',
     totalRooms: 3,
     availableRooms: 0,
@@ -325,6 +336,10 @@ const updateRoomAvailability = () => {
 // Update room availability on component mount
 onMounted(() => {
   updateRoomAvailability();
+  // Autofill email for logged-in users and prevent editing
+  if (user.value?.email) {
+    form.value.email = user.value.email as string;
+  }
 });
 
 const selectedRoom = ref<number|null>(null);
@@ -476,9 +491,12 @@ const numericPax = computed(() => {
 // Determines if a room category is allowed by pax rules
 function isRoomAllowedByPax(category: string, pax: number): boolean {
   if (isNaN(pax)) return true;
-  if (pax >= 1 && pax <= 2) return category === 'individual';
-  if (pax >= 5 && pax <= 10) return category === 'master';
-  if (pax >= 3 && pax <= 4) return category === 'common';
+  // Phone booth rooms: exactly 1 pax
+  if (category === 'individual') return pax === 1;
+  // Regular tables: 1-4 pax
+  if (category === 'common') return pax >= 1 && pax <= 4;
+  // Conference rooms: 1-10 pax
+  if (category === 'master') return pax >= 1 && pax <= 10;
   return false;
 }
 
@@ -491,10 +509,12 @@ function canSelectRoom(room: any): boolean {
 function paxDisallowText(room: any): string {
   const p = numericPax.value;
   if (isNaN(p)) return '';
-  if (p >= 1 && p <= 2 && room.category !== 'individual') return `Not allowed for ${p} pax`;
-  if (p >= 3 && p <= 4 && room.category !== 'common') return `Not allowed for ${p} pax`;
-  if (p >= 5 && p <= 10 && room.category !== 'master') return `Not allowed for ${p} pax`;
-  if (!(p === 1 || (p >= 3 && p <= 4) || (p >= 5 && p <= 10))) return `Not allowed for ${p} pax`;
+  // Only 1 pax allowed for phone booths
+  if (room.category === 'individual' && p !== 1) return `Not allowed for ${p} pax`;
+  // 1-4 pax for regular tables
+  if (room.category === 'common' && !(p >= 1 && p <= 4)) return `Not allowed for ${p} pax`;
+  // 1-10 pax allowed for conference rooms; show note only if outside 1-10
+  if (room.category === 'master' && !(p >= 1 && p <= 10)) return `Not allowed for ${p} pax`;
   return '';
 }
 </script>

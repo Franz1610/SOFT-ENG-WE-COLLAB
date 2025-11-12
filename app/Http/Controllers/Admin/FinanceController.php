@@ -36,7 +36,8 @@ class FinanceController extends Controller
                 'description' => "Payment for booking #{$entry->booking_id} - {$entry->customer_name}",
                 'type' => 'income',
                 'amount' => $entry->amount_received,
-                'category' => $entry->payment_method,
+                // Always show booking-linked payments under the unified category used by filters/UI
+                'category' => 'Booking Payment',
                 'payment_method' => $entry->payment_method,
                 'user' => $entry->creator,
                 'reference' => $entry->reference_notes,

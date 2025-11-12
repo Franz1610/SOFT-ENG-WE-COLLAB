@@ -54,21 +54,21 @@ class Booking extends Model
             
             // Check if it's a mapped room ID (1000+, 2000+, 3000+)
             if ($roomId >= 3000) {
-                // Master room
-                return "Master Room";
+                // Conference rooms (master)
+                return "Conference Rooms";
             } elseif ($roomId >= 2000) {
-                // Common room
-                return "Common Room";
+                // Regular tables (common)
+                return "Regular Tables";
             } elseif ($roomId >= 1000) {
-                // Individual room
-                return "Individual Room";
+                // Phone booth rooms (individual)
+                return "Phone Booth Rooms";
             }
             
             // Fallback for legacy numeric room IDs (1, 2, 3)
             $roomNames = [
-                1 => 'Individual Room',
-                2 => 'Master Room',
-                3 => 'Common Room',
+                1 => 'Phone Booth Rooms',
+                2 => 'Conference Rooms',
+                3 => 'Regular Tables',
             ];
             return $roomNames[$roomId] ?? 'Unknown Room';
         }
@@ -76,11 +76,11 @@ class Booking extends Model
         // Handle string room IDs (legacy - shouldn't happen with new system)
         if (is_string($this->room_id)) {
             if (str_starts_with($this->room_id, 'IND-')) {
-                return 'Individual Room';
+                return 'Phone Booth Rooms';
             } elseif (str_starts_with($this->room_id, 'COM-')) {
-                return 'Common Room';
+                return 'Regular Tables';
             } elseif (str_starts_with($this->room_id, 'MAS-')) {
-                return 'Master Room';
+                return 'Conference Rooms';
             }
         }
 

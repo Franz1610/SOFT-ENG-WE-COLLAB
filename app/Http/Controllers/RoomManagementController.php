@@ -165,7 +165,7 @@ class RoomManagementController extends Controller
         $categories = [
             'individual' => [
                 'id' => 1,
-                'name' => 'Individual Room',
+                'name' => 'Phone Booth Rooms',
                 'category' => 'individual',
                 'capacity' => '1 Person',
                 'amenities' => ['WiFi', 'Desk', 'Chair', 'Power Outlet', 'Desk Lamp'],
@@ -173,7 +173,7 @@ class RoomManagementController extends Controller
             ],
             'common' => [
                 'id' => 2,
-                'name' => 'Common Room',
+                'name' => 'Regular Tables',
                 'category' => 'common',
                 'capacity' => '2-4 People',
                 'amenities' => ['Smart TV', 'WiFi', 'Video Conferencing', 'Whiteboard'],
@@ -181,7 +181,7 @@ class RoomManagementController extends Controller
             ],
             'master' => [
                 'id' => 3,
-                'name' => 'Master Room',
+                'name' => 'Conference Rooms',
                 'category' => 'master',
                 'capacity' => '5-10 People',
                 'amenities' => ['4K Display', 'WiFi', 'Coffee Station', 'Video Conferencing', 'Whiteboard'],

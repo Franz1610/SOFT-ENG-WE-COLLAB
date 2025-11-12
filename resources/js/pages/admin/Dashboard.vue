@@ -21,6 +21,17 @@ const showLogoutModal = ref(false);
 
 const users = usePage().props.users as any[];
 
+// Dashboard metrics from server
+const metrics = computed(() => (page.props.metrics || {
+  totalUsers: users?.length ?? 0,
+  activeBookings: 0,
+  blockedUsers: users?.filter((u: any) => u.is_blocked)?.length ?? 0,
+}) as {
+  totalUsers: number;
+  activeBookings: number;
+  blockedUsers: number;
+});
+
 function closeLogoutModal() {
   showLogoutModal.value = false;
 }
@@ -37,17 +48,52 @@ function confirmLogout() {
 
     <AppLayout>
           <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 overflow-x-auto">
-              <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-                  <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                      <!-- Content for box 1 -->
-                  </div>
-                  <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                      <!-- Content for box 2 -->
-                  </div>
-                  <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                      <!-- Content for box 3 -->
-                  </div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <!-- Total Users -->
+          <div class="stat-card">
+            <div class="stat-inner">
+              <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                  <path d="M16 11c1.657 0 3-1.79 3-4s-1.343-4-3-4-3 1.79-3 4 1.343 4 3 4zM8 11c1.657 0 3-1.79 3-4S9.657 3 8 3 5 4.79 5 7s1.343 4 3 4zM8 13c-3.866 0-7 2.239-7 5v2h10v-2c0-1.657.895-3.156 2.344-4.25C12.106 13.275 10.145 13 8 13zm8 0c-.79 0-1.543.098-2.25.28A6.476 6.476 0 0 1 18 18v2h6v-2c0-2.761-3.134-5-7-5z"/>
+                </svg>
               </div>
+              <div class="stat-text">
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value">{{ metrics.totalUsers }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Bookings -->
+          <div class="stat-card">
+            <div class="stat-inner">
+              <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                  <path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v3H2V6a2 2 0 0 1 2-2h1V3a1 1 0 1 1 2 0v1zm15 8v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8h20zm-6.293 3.293-4.414 4.414-2.293-2.293-1.414 1.414 3.707 3.707 5.828-5.828-1.414-1.414z"/>
+                </svg>
+              </div>
+              <div class="stat-text">
+                <div class="stat-label">Active Bookings</div>
+                <div class="stat-value">{{ metrics.activeBookings }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blocked Users -->
+          <div class="stat-card">
+            <div class="stat-inner">
+              <div class="stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                  <path d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm5.657 5.757-9.9 9.9A8 8 0 0 1 17.657 7.757ZM6.343 16.243l9.9-9.9A8 8 0 0 1 6.343 16.243Z"/>
+                </svg>
+              </div>
+              <div class="stat-text">
+                <div class="stat-label">Blocked Users</div>
+                <div class="stat-value">{{ metrics.blockedUsers }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
               <div class="relative min-h-100vh flex-1 rounded-xl border border-sidebar-border/70 md:min-h-min dark:border-sidebar-border">
                   <UserCrud :users="users" />
               </div>
@@ -99,11 +145,42 @@ function confirmLogout() {
     border-color: #4b824b !important;
 }
 
-/* Card backgrounds */
-.grid > div {
-    background-color: #4b824b;
-    color: #FFFAE9;
-    border-color: #4b824b !important;
+/* Stats card styling */
+.stat-card {
+  background-color: #4b824b; /* green */
+  color: #FFFAE9; /* cream text */
+  border: 1px solid #4b824b;
+  border-radius: 0.75rem; /* rounded-lg */
+  padding: 1rem; /* p-4 */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12); /* soft shadow */
+}
+
+.stat-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4.5rem;
+}
+
+.stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background: rgba(255, 250, 233, 0.18); /* subtle cream tint */
+}
+
+.stat-text .stat-label {
+  font-size: 0.875rem;
+  opacity: 0.95;
+}
+
+.stat-text .stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 /* Main content area */

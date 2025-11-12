@@ -99,10 +99,10 @@
                   <template v-else-if="booking.status && booking.status.toLowerCase() === 'rejected'">
                     <span class="status-badge bg-red-200 text-red-800 mr-2">Rejected</span>
                     <Button
-                      @click="openPayModal(booking.id)"
+                      @click="rebook()"
                       class="pay-btn"
-                      title="Resubmit Payment"
-                    >Resubmit</Button>
+                      title="Make a new booking"
+                    >Rebook</Button>
                   </template>
                   <span v-else-if="booking.status && booking.status.toLowerCase() === 'paid'" class="status-badge bg-green-200 text-green-900">Paid</span>
                   <span v-else class="cannot-cancel-text">
@@ -401,6 +401,11 @@ function openPayModal(bookingId: number) {
   if (!bookingId) return;
   payBookingId.value = bookingId;
   showPayModal.value = true;
+}
+
+// Redirect user to booking page to create a new booking after rejection
+function rebook() {
+  router.visit('/booking');
 }
 
 function closePayModal() {

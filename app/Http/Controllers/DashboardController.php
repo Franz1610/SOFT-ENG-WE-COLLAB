@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -29,8 +30,23 @@ class DashboardController extends Controller
             ];
         });
         
+        // Dashboard metrics
+        $totalUsers = User::count();
+        $blockedUsers = User::where('is_blocked', true)->count();
+        
+        // Define "active" as bookings that are not cancelled/rejected and are for today or later
+        // Status considered active: pending, confirmed
+        $activeBookings = Booking::whereIn('status', ['pending', 'confirmed'])
+            ->whereDate('booking_date', '>=', now()->toDateString())
+            ->count();
+        
         return Inertia::render('admin/Dashboard', [
             'users' => $users,
+            'metrics' => [
+                'totalUsers' => $totalUsers,
+                'activeBookings' => $activeBookings,
+                'blockedUsers' => $blockedUsers,
+            ],
         ]);
     }
 }

@@ -233,16 +233,32 @@ class BookingController extends Controller
         }
 
         if ($entry) {
-            // If previously declined or unprocessed, reset review state for resubmission
+            // Prevent changes after verification
+            if ($entry->status === 'Verified') {
+                return redirect('/booking/history')->with('error', 'Payment already verified. Updates are not allowed.');
+            }
+
+            // Reset review state for a clean resubmission
             $entry->status = 'Pending Review';
             $entry->reviewed_by = null;
             $entry->decline_reason = null;
             $entry->declined_at = null;
-            // Incremental payment: accumulate amount and append notes
-            $entry->amount_received = (float)$entry->amount_received + (float)$validated['amount_paid'];
-            $entry->gross_total = (float)$entry->gross_total + (float)$validated['amount_paid'];
-            $entry->reference_notes = trim(($entry->reference_notes ?: '') . "\n" . $notes);
-            $entry->net_revenue = (float)$entry->amount_received - (float)$entry->gateway_fee - (float)$entry->tax_collected;
+
+            // Option B: Replace amounts (do NOT accumulate)
+            $entry->amount_received = (float)$validated['amount_paid'];
+            $entry->gross_total = (float)$validated['amount_paid'];
+
+            // Preserve audit trail by appending context
+            $entry->reference_notes = trim(
+                $notes .
+                ($entry->reference_notes ? "\nPrevious submission replaced at " . now()->format('Y-m-d H:i:s') : '')
+            );
+
+            // Recompute net revenue from the replaced amount
+            $entry->net_revenue = (float)$entry->amount_received
+                - (float)$entry->gateway_fee
+                - (float)$entry->tax_collected;
+
             $entry->save();
         } else {
             FinanceEntry::create([
