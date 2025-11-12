@@ -46,17 +46,36 @@
       <div class="w-full max-w-5xl bg-white rounded-lg shadow-lg p-8">
         <div class="mb-8">
           <h1 class="text-3xl font-bold mb-2 text-neutral-900">BOOKING HISTORY/MODIFY</h1>
-          <p class="text-neutral-600">Any changes for the day??</p>
+          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+            <p class="text-neutral-600">Any changes for the day??</p>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
+                <label for="categoryFilter" class="text-sm text-neutral-700">Filter by category</label>
+                <select id="categoryFilter" v-model="categoryFilter" class="border border-gray-300 rounded-md px-3 py-2 text-sm min-w-[180px]">
+                  <option value="All">All</option>
+                  <option v-for="c in uniqueCategories" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-2">
+                <label for="roomFilter" class="text-sm text-neutral-700">Filter by room</label>
+                <select id="roomFilter" v-model="roomFilter" class="border border-gray-300 rounded-md px-3 py-2 text-sm min-w-[140px]">
+                  <option value="All">All</option>
+                  <option v-for="r in uniqueRooms" :key="r" :value="r">{{ r }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Booking History Table -->
         <div class="w-full">
           <div class="bg-gray-200 rounded-lg overflow-hidden">
             <!-- Table Header -->
-            <div class="grid grid-cols-5 gap-4 p-4 bg-gray-300 font-semibold text-gray-700 text-sm">
+            <div class="grid grid-cols-6 gap-4 p-4 bg-gray-300 font-semibold text-gray-700 text-sm">
               <div>ID</div>
               <div>DATE</div>
               <div>CATEGORY</div>
+              <div>ROOM</div>
               <div>TIME</div>
               <div class="text-center">STATUS</div>
             </div>
@@ -66,7 +85,7 @@
               <div 
                 v-for="booking in paginatedBookings" 
                 :key="booking.id"
-                class="grid grid-cols-5 gap-4 p-4 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                class="grid grid-cols-6 gap-4 p-4 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <div>
                   <button 
@@ -79,6 +98,7 @@
                 </div>
                 <div>{{ booking.date }}</div>
                 <div>{{ formatCategory(booking.category) }}</div>
+                <div>{{ booking.room ?? '—' }}</div>
                 <div>{{ booking.time }}</div>
                 <div class="status-cell">
                   <span
@@ -235,6 +255,8 @@
           <div class="value">{{ selectedBooking.date }}</div>
           <div class="label">Category</div>
           <div class="value">{{ formatCategory(selectedBooking.category) }}</div>
+          <div class="label">Room</div>
+          <div class="value">{{ selectedBooking.room ?? '—' }}</div>
           <div class="label">Time</div>
           <div class="value">{{ selectedBooking.time }}</div>
           <template v-if="selectedBooking.duration_hours">
@@ -283,7 +305,7 @@
             <form @submit.prevent="submitPayment" class="pay-form" novalidate>
               <div class="form-group">
                 <label for="amountPaid" class="form-label">Amount Paid (PHP)</label>
-                <select id="amountPaid" v-model="amountPaid" class="input">
+                <select id="amountPaid" v-model="amountPaid" class="input" :disabled="Number(amountDue) > 0">
                   <option disabled value="">Select amount</option>
                   <option v-for="opt in allowedAmounts" :key="opt.value" :value="opt.value">
                     {{ opt.label }}
@@ -304,7 +326,7 @@
               </div>
               <p v-if="amountHint" class="hint" aria-live="polite">{{ amountHint }}</p>
               <div class="actions">
-                <Button type="submit" :disabled="isSubmitting" class="submit-btn text-white">{{ isSubmitting ? 'Pay…' : 'Pay' }}</Button>
+                <Button type="submit" :disabled="!canSubmitPayment" class="submit-btn text-white">{{ isSubmitting ? 'Pay…' : 'Pay' }}</Button>
                 <Button type="button" variant="outline" class="cancel-btn-alt" @click="closePayModal">Cancel</Button>
               </div>
               <!-- Promo image sits below the two buttons -->
@@ -320,7 +342,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import {
@@ -339,13 +361,57 @@ const user = computed(() => page.props.auth.user);
 // Get bookings from props (passed from backend)
 const bookings = ref((page.props.bookings as any[]) || []);
 
+// Filters state
+const categoryFilter = ref<string>('All');
+// Room filter state and helpers
+const roomFilter = ref<string>('All');
+const uniqueRooms = computed<string[]>(() => {
+  const vals = bookings.value
+    .map(b => (b.room ? String(b.room) : null))
+    .filter((v): v is string => !!v);
+  // Unique
+  const set = Array.from(new Set(vals));
+  // Sort by numeric suffix if possible (Room 1, Room 2, ...)
+  const num = (s: string) => {
+    const m = /(\d+)$/.exec(s);
+    return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+  };
+  return set.sort((a, b) => num(a) - num(b));
+});
+
+const filteredBookings = computed(() => {
+  return bookings.value.filter(b => {
+    const matchesRoom = roomFilter.value === 'All' || (b.room ? String(b.room) : '') === roomFilter.value;
+    const matchesCategory = categoryFilter.value === 'All' || formatCategory(b.category) === categoryFilter.value;
+    return matchesRoom && matchesCategory;
+  });
+});
+
 // Pagination state
 const currentPage = ref(1);
 const pageSize = 5;
-const totalPages = computed(() => Math.ceil(bookings.value.length / pageSize));
+const totalPages = computed(() => Math.ceil(filteredBookings.value.length / pageSize));
 const paginatedBookings = computed(() =>
-  bookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
+  filteredBookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 );
+
+watch(roomFilter, () => {
+  currentPage.value = 1;
+});
+
+watch(categoryFilter, () => {
+  currentPage.value = 1;
+});
+
+const uniqueCategories = computed<string[]>(() => {
+  const labels = bookings.value.map(b => formatCategory(b.category));
+  const set = Array.from(new Set(labels));
+  // Keep a friendly order if all exist
+  const order = ['Phone booth rooms', 'Regular tables', 'Conference rooms'];
+  return set.sort((a, b) => (order.indexOf(a) !== -1 && order.indexOf(b) !== -1)
+    ? order.indexOf(a) - order.indexOf(b)
+    : a.localeCompare(b));
+});
 
 // Modal state
 const showLogoutModal = ref(false);
@@ -375,7 +441,8 @@ const amountDue = computed(() => {
 });
 const currentPaid = computed(() => {
   if (!activeBooking.value) return 0;
-  return activeBooking.value.amount_paid ?? activeBooking.value.paid ?? 0;
+  const v = activeBooking.value.amount_paid ?? 0;
+  return Number(v) || 0;
 });
 const remainingAmount = computed(() => Math.max(amountDue.value - currentPaid.value, 0));
 
@@ -387,9 +454,16 @@ function formatCurrency(v: number) {
 type AmountOption = { label: string; value: string };
 const allowedAmounts = computed<AmountOption[]>(() => {
   const cat = (activeBooking.value?.category ?? '').toString().toLowerCase();
+  const due = Number(activeBooking.value?.amount_due ?? 0);
   const make = (nums: number[], suffix = ''): AmountOption[] =>
-    nums.map(n => ({ label: `PHP ${n.toFixed(2)}${suffix}`, value: String(n) }));
+    nums.map(n => ({ label: `PHP ${n.toFixed(2)}${suffix}` + (Math.abs(n - due) < 0.001 ? ' • Due' : ''), value: String(n) }));
 
+  // If we have an exact due, prefer to show it as the primary option
+  if (due > 0) {
+    return make([due]);
+  }
+
+  // Fallback presets by category (when due isn't available)
   if (cat.includes('individual') || cat.includes('indiv')) {
     return make([70, 120, 150, 200]);
   }
@@ -397,7 +471,8 @@ const allowedAmounts = computed<AmountOption[]>(() => {
     return make([39, 99, 195, 245]);
   }
   if (cat.includes('master')) {
-    return make([200, 300], '/hr');
+    // Without a computed due, provide typical choices
+    return make([200, 300]);
   }
   // Fallback: no predefined options
   return [];
@@ -474,6 +549,11 @@ function openPayModal(bookingId: number) {
   if (!bookingId) return;
   payBookingId.value = bookingId;
   showPayModal.value = true;
+  // Preselect exact due when available to avoid partial payments
+  nextTick(() => {
+    const dueNum = Number(amountDue.value || 0);
+    amountPaid.value = dueNum > 0 ? String(dueNum) : '';
+  });
 }
 
 // Open booking details modal
@@ -521,6 +601,11 @@ async function submitPayment() {
     amountHint.value = 'Invalid amount selected.';
     return;
   }
+  const due = Number(amountDue.value || 0);
+  if (Math.abs(amt - due) > 0.01) {
+    amountHint.value = 'Partial payments are not allowed. Please pay the full amount due.';
+    return;
+  }
   if (!referenceNo.value.trim()) {
     amountHint.value = 'Please provide the GCash reference number.';
     return;
@@ -550,6 +635,13 @@ async function submitPayment() {
     isSubmitting.value = false;
   }
 }
+
+const canSubmitPayment = computed(() => {
+  if (isSubmitting.value) return false;
+  const due = Number(amountDue.value || 0);
+  const amt = parseFloat(amountPaid.value || '0');
+  return due > 0 && Math.abs(amt - due) < 0.01;
+});
 
 // Navigation functions
 function goHome() {

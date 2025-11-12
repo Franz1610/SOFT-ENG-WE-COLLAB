@@ -47,7 +47,7 @@
         <h1 class="text-3xl font-bold mb-2 text-center text-neutral-900">SELECT DATE & TIME</h1>
         <p class="text-center text-neutral-600 mb-8">Choose your preferred date and time for your booking</p>
         
-        <form @submit.prevent="submitSchedule" class="space-y-6">
+  <form @submit.prevent="submitSchedule" class="space-y-6">
           <div>
             <Label for="date">Date</Label>
             <Input 
@@ -151,6 +151,26 @@
               </select>
             </div>
           </div>
+
+          <!-- Room selection -->
+          <div>
+            <Label>Room</Label>
+            <div class="mt-1">
+              <select 
+                v-model="selectedRoomId"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                :disabled="roomLoading || availableRooms.length === 0"
+              >
+                <option value="" disabled>Select a room</option>
+                <option v-for="r in availableRooms" :key="r.id" :value="r.id">
+                  {{ r.number }}
+                </option>
+              </select>
+              <p v-if="!canFetchRooms" class="text-xs text-neutral-500 mt-1">Select date and time first to see available rooms.</p>
+              <p v-else-if="roomLoading" class="text-xs text-neutral-500 mt-1">Loading rooms…</p>
+              <p v-else-if="availableRooms.length === 0" class="text-xs text-red-600 mt-1">No rooms available for this slot.</p>
+            </div>
+          </div>
           
           <div class="flex gap-3">
             <Button 
@@ -164,6 +184,7 @@
             <Button 
               type="submit" 
               class="flex-1 bg-[#495846] hover:bg-[#38613a] text-white border-none"
+              :disabled="!selectedRoomId"
             >
               Confirm Schedule
             </Button>
@@ -201,6 +222,10 @@
             <div class="flex justify-between items-center">
               <span class="font-medium" style="color: #495846;">Duration:</span>
               <span class="font-semibold" style="color: #495846;">{{ form.durationHours }} hour{{ parseInt(form.durationHours) > 1 ? 's' : '' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Room:</span>
+              <span class="font-semibold" style="color: #495846;">{{ selectedRoomLabel }}</span>
             </div>
             <div class="flex justify-between items-center">
               <span class="font-medium" style="color: #495846;">Price Estimate:</span>
@@ -337,6 +362,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getDurationOptions, computePrice, formatPHP } from '@/utils/promo';
+import axios from 'axios';
 import {
   Dialog,
   DialogContent,
@@ -850,6 +876,10 @@ function submitSchedule() {
 function confirmBooking() {
   // Get booking data from props (passed from session)
   const bookingData = page.props as any;
+  if (!selectedRoomId.value) {
+    alert('Please select a room for your chosen time slot.');
+    return;
+  }
   
   // Prepare booking data
   const submitData = {
@@ -860,7 +890,7 @@ function confirmBooking() {
     additional_info: bookingData.additional || '',
     pax: bookingData.pax || 1,
     category: bookingData.category || 'individual',
-    room_id: bookingData.room_id || 1,
+    room_id: Number(selectedRoomId.value),
     booking_date: form.value.date,
     start_time: formatTimeDisplay(form.value.startTime),
     end_time: formatTimeDisplay(form.value.endTime),
@@ -887,6 +917,10 @@ function closeModal() {
 function viewMyBookings() {
   // Get booking data from props (passed from session)
   const bookingData = page.props as any;
+  if (!selectedRoomId.value) {
+    alert('Please select a room for your chosen time slot.');
+    return;
+  }
   
   // Prepare booking data
   const submitData = {
@@ -897,7 +931,7 @@ function viewMyBookings() {
     additional_info: bookingData.additional || '',
     pax: bookingData.pax || 1,
     category: bookingData.category || 'individual',
-    room_id: bookingData.room_id || 1,
+    room_id: Number(selectedRoomId.value),
     booking_date: form.value.date,
     start_time: formatTimeDisplay(form.value.startTime),
     end_time: formatTimeDisplay(form.value.endTime),
@@ -977,6 +1011,67 @@ const estimatedPrice = computed(() => {
 const estimatedPriceDisplay = computed(() => {
   const val = estimatedPrice.value;
   return val == null ? '—' : formatPHP(val);
+});
+
+// -------- Room availability & selection --------
+type AvailRoom = { id: number; number: string; actual: string };
+const availableRooms = ref<AvailRoom[]>([]);
+const roomLoading = ref(false);
+const selectedRoomId = ref<number | null>(null);
+
+const canFetchRooms = computed(() => {
+  return Boolean(
+    form.value.date &&
+    form.value.startTime.hour && form.value.startTime.minute && form.value.startTime.period &&
+    form.value.endTime.hour && form.value.endTime.minute && form.value.endTime.period
+  );
+});
+
+const selectedRoomLabel = computed(() => {
+  const r = availableRooms.value.find(x => x.id === selectedRoomId.value);
+  return r ? r.number : '—';
+});
+
+async function fetchAvailableRooms() {
+  if (!canFetchRooms.value) {
+    availableRooms.value = [];
+    selectedRoomId.value = null;
+    return;
+  }
+  roomLoading.value = true;
+  try {
+    const resp = await axios.get('/rooms/available', {
+      params: {
+        category: bookingCategory.value,
+        date: form.value.date,
+        start_time: formatTimeDisplay(form.value.startTime),
+        end_time: formatTimeDisplay(form.value.endTime),
+      }
+    });
+    const rooms = Array.isArray(resp.data?.rooms) ? resp.data.rooms as AvailRoom[] : [];
+    availableRooms.value = rooms;
+    if (!rooms.find(r => r.id === selectedRoomId.value)) {
+      selectedRoomId.value = null;
+    }
+  } catch (e) {
+    console.error('Failed to load rooms', e);
+    availableRooms.value = [];
+    selectedRoomId.value = null;
+  } finally {
+    roomLoading.value = false;
+  }
+}
+
+// Refetch when date/time/duration changes
+watch([
+  () => form.value.date,
+  () => form.value.startTime.hour,
+  () => form.value.startTime.minute,
+  () => form.value.startTime.period,
+  () => form.value.durationHours,
+], () => {
+  // endTime already syncs from start + duration via existing watcher
+  fetchAvailableRooms();
 });
 </script>
 

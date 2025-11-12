@@ -19,8 +19,101 @@ class RoomManagementController extends Controller
         ]);
     }
 
-    public function getRoomData($category)
+    /**
+     * Return the list of available rooms for a category within a date/time range.
+     * Request params: category (individual|common|master), date (Y-m-d), start_time (e.g., "02:00 PM"), end_time
+     * Response: [{ id: number, number: string, actual: string }]
+     */
+    public function getAvailableRooms(Request $request)
     {
+        $validated = $request->validate([
+            'category' => 'required|string|in:individual,common,master',
+            'date' => 'required|date',
+            'start_time' => 'required|string',
+            'end_time' => 'required|string',
+        ]);
+
+        // Parse times into 24h HH:MM:SS using tolerant parser
+        $start = $this->toHms($validated['start_time']);
+        $end = $this->toHms($validated['end_time']);
+
+        if (!$start || !$end || $start >= $end) {
+            return response()->json(['rooms' => [], 'message' => 'Invalid time range'], 422);
+        }
+
+        $date = Carbon::parse($validated['date'])->toDateString();
+        // Date must be today or later
+        if ($date < Carbon::today()->toDateString()) {
+            return response()->json(['rooms' => [], 'message' => 'Date cannot be in the past'], 422);
+        }
+        $category = $validated['category'];
+
+        // Load rooms for category (exclude maintenance)
+        $rooms = Room::where('category', $category)
+            ->where('status', '!=', 'maintenance')
+            ->get()
+            ->sortBy(function ($room) {
+                if (preg_match('/-(\d+)$/', $room->room_number, $m)) {
+                    return (int)$m[1];
+                }
+                return 0;
+            })
+            ->values();
+
+        $available = [];
+
+        foreach ($rooms as $idx => $room) {
+            $roomIdInt = $this->mapRoomNumberToInteger($category, $room->room_number);
+            // Check conflicts with confirmed bookings only (pending should not block)
+            $hasConflict = Booking::where('category', $category)
+                ->where('room_id', $roomIdInt)
+                ->whereDate('booking_date', $date)
+                ->where('status', 'confirmed')
+                ->where(function ($q) use ($start, $end) {
+                    $q->where(function ($inner) use ($start, $end) {
+                        $inner->where('start_time', '<', $end)
+                              ->where('end_time', '>', $start);
+                    });
+                })
+                ->exists();
+
+            if (!$hasConflict) {
+                $available[] = [
+                    'id' => $roomIdInt,
+                    'number' => 'Room ' . ($idx + 1),
+                    'actual' => $room->room_number,
+                ];
+            }
+        }
+
+        return response()->json(['rooms' => $available]);
+    }
+
+    /** Convert loose time string (e.g., "2:00 PM" or "14:00") to HH:MM:SS; null on failure. */
+    private function toHms(string $time): ?string
+    {
+        try {
+            return Carbon::createFromFormat('h:i A', $time)->format('H:i:s');
+        } catch (\Exception $e) {
+            try {
+                return Carbon::createFromFormat('H:i', $time)->format('H:i:s');
+            } catch (\Exception $e) {
+                try {
+                    return Carbon::createFromFormat('H:i:s', $time)->format('H:i:s');
+                } catch (\Exception $e) {
+                    return null;
+                }
+            }
+        }
+    }
+
+    public function getRoomData(Request $request, $category)
+    {
+        // If a specific date/time range is provided, compute statuses for that window
+        $queryDate = $request->query('date');
+        $queryStart = $request->query('start_time');
+        $queryEnd = $request->query('end_time');
+
         // Get today's date using the app timezone
         $today = Carbon::today()->toDateString();
         
@@ -64,6 +157,80 @@ class RoomManagementController extends Controller
             ->where('start_time', '>', $currentTime)
             ->get();
 
+        // If a date/time filter is provided, compute statuses for that window instead of live view
+        if ($queryDate && $queryStart && $queryEnd) {
+            $selectedDate = Carbon::parse($queryDate)->toDateString();
+            $start = $this->toHms($queryStart);
+            $end = $this->toHms($queryEnd);
+            if (!$start || !$end || $start >= $end) {
+                return response()->json(['error' => 'Invalid time range'], 422);
+            }
+
+            $totalRooms = $this->getTotalRoomsByCategory($category);
+            $maintenanceRooms = Room::where('category', $category)
+                ->where('status', 'maintenance')
+                ->get();
+
+            $rooms = [];
+            for ($i = 1; $i <= $totalRooms; $i++) {
+                $roomNumber = "Room {$i}";
+                $actualRoomNumber = $this->mapFrontendToActualRoomNumber($category, $roomNumber);
+                $roomIdInt = $this->mapRoomNumberToInteger($category, $actualRoomNumber);
+
+                $maintenanceRoom = $maintenanceRooms->firstWhere('room_number', $actualRoomNumber);
+                if ($maintenanceRoom) {
+                    $rooms[] = [
+                        'number' => $roomNumber,
+                        'status' => 'Maintenance',
+                        'capacity' => $this->getDefaultCapacity($category, $roomNumber),
+                        'guest' => null,
+                        'timeRange' => null,
+                        'booking_id' => null
+                    ];
+                    continue;
+                }
+
+                // Find a confirmed booking overlapping the requested window for this room
+                $overlap = Booking::where('category', $category)
+                    ->where('room_id', $roomIdInt)
+                    ->whereDate('booking_date', $selectedDate)
+                    ->where('status', 'confirmed')
+                    ->where(function($q) use ($start, $end) {
+                        $q->where(function($inner) use ($start, $end) {
+                            $inner->where('start_time', '<', $end)
+                                  ->where('end_time', '>', $start);
+                        });
+                    })
+                    ->first();
+
+                if ($overlap) {
+                    $isToday = $selectedDate === $today;
+                    $nowTime = Carbon::now()->format('H:i:s');
+                    $isActiveNow = $isToday && $overlap->start_time <= $nowTime && $overlap->end_time > $nowTime;
+                    $rooms[] = [
+                        'number' => $roomNumber,
+                        'status' => $isActiveNow ? 'Occupied' : 'Reserved',
+                        'capacity' => $overlap->pax,
+                        'guest' => $overlap->first_name . ' ' . $overlap->last_name,
+                        'timeRange' => $this->formatTimeRange($overlap->start_time, $overlap->end_time),
+                        'booking_id' => $overlap->id
+                    ];
+                } else {
+                    $rooms[] = [
+                        'number' => $roomNumber,
+                        'status' => 'Available',
+                        'capacity' => $this->getDefaultCapacity($category, $roomNumber),
+                        'guest' => null,
+                        'timeRange' => null,
+                        'booking_id' => null
+                    ];
+                }
+            }
+
+            return response()->json($rooms);
+        }
+
+        // Default/live view for TODAY (no filters): compute active and upcoming
         // Get total number of rooms for this category
         $totalRooms = $this->getTotalRoomsByCategory($category);
         
@@ -84,7 +251,6 @@ class RoomManagementController extends Controller
             // Map to the integer room_id that would be stored in the database
             $roomIdInt = $this->mapRoomNumberToInteger($category, $actualRoomNumber);
             
-            // Check if this room is in maintenance
             $maintenanceRoom = $maintenanceRooms->firstWhere('room_number', $actualRoomNumber);
             
             if ($maintenanceRoom) {
@@ -111,7 +277,7 @@ class RoomManagementController extends Controller
                         'booking_id' => $activeBooking->id
                     ];
                 } else {
-                    // Look for an upcoming booking for this specific room
+                    // Look for an upcoming booking for this specific room (confirmed only)
                     $upcomingBooking = $upcomingBookings->firstWhere('room_id', $roomIdInt);
                     
                     if ($upcomingBooking) {
@@ -210,9 +376,8 @@ class RoomManagementController extends Controller
                 ->where('start_time', '>', $currentTime)
                 ->count();
 
-            // Count ALL confirmed bookings for today (both current and future) for availability calculation
-            // This is because users can't book a room that already has any confirmed booking for today
-            $allConfirmedBookingsToday = Booking::where('category', $key)
+            // Count confirmed bookings for today for availability calculation (pending should not block)
+            $allBookingsToday = Booking::where('category', $key)
                 ->whereDate('booking_date', $today)
                 ->where('status', 'confirmed')
                 ->count();
@@ -221,8 +386,8 @@ class RoomManagementController extends Controller
                 ->where('status', 'maintenance')
                 ->count();
 
-            // Available rooms should exclude ALL rooms with confirmed bookings today (not just currently occupied)
-            $category['availableRooms'] = $category['totalRooms'] - $allConfirmedBookingsToday - $maintenanceRoomsCount;
+            // Available rooms should exclude rooms with confirmed bookings today
+            $category['availableRooms'] = $category['totalRooms'] - $allBookingsToday - $maintenanceRoomsCount;
             // But occupied rooms only shows currently active bookings
             $category['occupiedRooms'] = $currentlyOccupiedBookings;
             // Reserved rooms shows upcoming bookings
@@ -235,7 +400,8 @@ class RoomManagementController extends Controller
 
     private function getTotalRoomsByCategory($category)
     {
-        return Room::where('category', $category)->count() ?: 1;
+        // Return the real count; if none exist, it's 0 (admin should add rooms via Room Management)
+        return Room::where('category', $category)->count();
     }
 
     private function getDefaultCapacity($category, $roomNumber = null)
@@ -316,6 +482,24 @@ class RoomManagementController extends Controller
             ], 404);
         }
 
+        // If setting to maintenance, ensure there is no active or upcoming confirmed booking today
+        if ($dbStatus === 'maintenance') {
+            $today = Carbon::today()->toDateString();
+            $roomIdInt = $this->mapRoomNumberToInteger($category, $actualRoomNumber);
+            $hasConflict = Booking::where('category', $category)
+                ->where('room_id', $roomIdInt)
+                ->whereDate('booking_date', '>=', $today)
+                ->where('status', 'confirmed')
+                ->exists();
+            if ($hasConflict) {
+                \Log::warning("Attempt to set maintenance while bookings exist for {$actualRoomNumber}");
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot set to maintenance: there are confirmed bookings scheduled for this room.'
+                ], 400);
+            }
+        }
+
         // Update the room status
         $room->update(['status' => $dbStatus]);
         
@@ -327,7 +511,7 @@ class RoomManagementController extends Controller
     public function addRooms(Request $request)
     {
         $validated = $request->validate([
-            'category' => 'required|string',
+            'category' => 'required|string|in:individual,common,master',
             'numberOfRooms' => 'required|integer|min:1|max:50'
         ]);
 
@@ -425,18 +609,18 @@ class RoomManagementController extends Controller
             ], 404);
         }
 
-        // Check if room is occupied (has active bookings)
+        // Check if room is occupied now or has any upcoming confirmed bookings (today or future)
         $today = Carbon::today()->toDateString();
-        $activeBooking = Booking::where('category', $category)
-            ->where('room_id', $actualRoomNumber)
-            ->whereDate('booking_date', $today)
+        $hasConfirmed = Booking::where('category', $category)
+            ->where('room_id', $this->mapRoomNumberToInteger($category, $actualRoomNumber))
+            ->whereDate('booking_date', '>=', $today)
             ->where('status', 'confirmed')
             ->exists();
 
-        if ($activeBooking) {
+        if ($hasConfirmed) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete room with active bookings'
+                'message' => 'Cannot delete room with confirmed bookings scheduled or active.'
             ], 400);
         }
 
@@ -560,24 +744,10 @@ class RoomManagementController extends Controller
             // Get today's date
             $today = Carbon::today()->toDateString();
             
-            // Validate that the time is not in the past (on server side as well)
+            // For walk-ins, occupancy should start NOW (server time). Ignore provided start_time.
             $now = Carbon::now();
-            $today = $now->toDateString();
-            
-            // Create Carbon instances for the selected times
-            $startDateTime = Carbon::createFromFormat('Y-m-d H:i', $today . ' ' . $validated['start_time']);
+            $startTimeHms = $now->format('H:i');
             $endDateTime = Carbon::createFromFormat('Y-m-d H:i', $today . ' ' . $validated['end_time']);
-            
-            // Add 1 minute tolerance for walk-in bookings
-            $oneMinuteAgo = $now->copy()->subMinute();
-            
-            if ($startDateTime->lt($oneMinuteAgo)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Start time cannot be in the past.'
-                ], 400);
-            }
-            
             if ($endDateTime->lt($now)) {
                 return response()->json([
                     'success' => false,
@@ -592,11 +762,11 @@ class RoomManagementController extends Controller
                 ->where('room_id', $roomIdInt) // Use integer ID for conflict check
                 ->whereDate('booking_date', $today)
                 ->where('status', 'confirmed')
-                ->where(function ($query) use ($validated) {
-                    $query->whereBetween('start_time', [$validated['start_time'], $validated['end_time']])
-                          ->orWhereBetween('end_time', [$validated['start_time'], $validated['end_time']])
-                          ->orWhere(function ($q) use ($validated) {
-                              $q->where('start_time', '<=', $validated['start_time'])
+                ->where(function ($query) use ($startTimeHms, $validated) {
+                    $query->whereBetween('start_time', [$startTimeHms, $validated['end_time']])
+                          ->orWhereBetween('end_time', [$startTimeHms, $validated['end_time']])
+                          ->orWhere(function ($q) use ($startTimeHms, $validated) {
+                              $q->where('start_time', '<=', $startTimeHms)
                                 ->where('end_time', '>=', $validated['end_time']);
                           });
                 })
@@ -636,7 +806,7 @@ class RoomManagementController extends Controller
                 'category' => $validated['category'],
                 'room_id' => $roomIdInt, // Use integer ID
                 'booking_date' => $today,
-                'start_time' => $validated['start_time'],
+                'start_time' => $startTimeHms, // Occupy from NOW
                 'end_time' => $validated['end_time'],
                 'status' => 'confirmed', // Walk-in bookings are automatically confirmed
             ]);
@@ -670,8 +840,12 @@ class RoomManagementController extends Controller
         
         $baseId = $categoryMap[$category] ?? 1000;
         
-        // Extract numeric part from room number (e.g., "IND-01" → "01" → 1)
+        // Extract numeric part from room number (supports "IND-01" and "Room 1" formats)
         if (preg_match('/\-(\d+)$/', $roomNumber, $matches)) {
+            $roomNum = (int)$matches[1];
+            return $baseId + $roomNum;
+        }
+        if (preg_match('/Room\s+(\d+)/i', $roomNumber, $matches)) {
             $roomNum = (int)$matches[1];
             return $baseId + $roomNum;
         }

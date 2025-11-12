@@ -20,7 +20,8 @@ class BookingController extends Controller
             'additional_info' => 'nullable|string',
             'pax' => 'required|integer|min:1',
             'category' => 'required|in:individual,master,common',
-            'room_id' => 'required|integer|in:1,2,3',
+            // Accept mapped integer room IDs (e.g., 1001+, 2001+, 3001+)
+            'room_id' => 'required|integer|min:1',
             'booking_date' => 'required|date|after_or_equal:today',
             'start_time' => 'required|string',
             'end_time' => 'required|string',
@@ -38,10 +39,15 @@ class BookingController extends Controller
             return back()->with('error', 'End time must be after start time.');
         }
 
-        // Prevent overlapping bookings (pending or confirmed) for same room and date
+        // Validate that the selected room matches the selected category via mapped ID
+        if (!$this->roomIdMatchesCategory((int)$validated['room_id'], $validated['category'])) {
+            return back()->with('error', 'Selected room does not match the chosen room type.');
+        }
+
+        // Prevent overlapping bookings for same room and date (confirmed only to keep UX consistent)
         $overlap = Booking::where('booking_date', $validated['booking_date'])
             ->where('room_id', $validated['room_id'])
-            ->whereIn('status', ['pending', 'confirmed'])
+            ->where('status', 'confirmed')
             ->where(function($q) use ($startTime, $endTime) {
                 $q->where(function($inner) use ($startTime, $endTime) {
                     // Existing booking starts before new end AND ends after new start => overlap
@@ -125,10 +131,13 @@ class BookingController extends Controller
                 $paid = $finance && $finance->status === 'Verified';
                 $rejected = $finance && $finance->status === 'Unprocessed' && $finance->decline_reason;
                 $pendingPayment = !$paid && !$rejected && $finance && $finance->status === 'Pending Review';
+                $amountPaid = $finance ? (float)($finance->amount_received ?? 0) : 0.0;
                 return [
                     'id' => $booking->id,
                     'date' => $booking->booking_date->format('F j, Y'),
                     'category' => ucfirst($booking->category) . ' room',
+                    // Show the specific room selected (Room N)
+                    'room' => $this->formatRoomLabel($booking->room_id),
                     'time' => $booking->formatted_time,
                     'status' => $paid ? 'Paid' : ($rejected ? 'Rejected' : ($pendingPayment ? 'Pending Payment' : $this->mapStatus($booking->status))),
                     'paid' => $paid,
@@ -136,10 +145,38 @@ class BookingController extends Controller
                     'can_cancel' => $booking->status === 'pending' && $booking->booking_date >= now()->toDateString(),
                     'duration_hours' => $booking->duration_hours,
                     'estimated_price' => $booking->estimated_price,
+                    // Payment figures for the Pay modal
+                    'amount_due' => $booking->estimated_price ?? null,
+                    'amount_paid' => $amountPaid,
                 ];
             });
 
         return $bookings;
+    }
+
+    /** Convert stored room_id (mapped int or legacy string) to a user-friendly "Room N" label. */
+    private function formatRoomLabel($roomId): ?string
+    {
+        if (is_null($roomId)) return null;
+
+        // If it's the mapped integer format (1001+, 2001+, 3001+), use the suffix as room number
+        if (is_numeric($roomId)) {
+            $id = (int) $roomId;
+            if ($id >= 1001) {
+                $n = $id % 1000;
+                if ($n > 0) return 'Room ' . $n;
+            }
+            // Legacy small numeric IDs (1,2,3) have no specific room; skip
+            return null;
+        }
+
+        // Legacy string format like IND-01, COM-03, MAS-10
+        if (is_string($roomId) && preg_match('/-(\d+)$/', $roomId, $m)) {
+            $n = (int)$m[1];
+            if ($n > 0) return 'Room ' . $n;
+        }
+
+        return null;
     }
 
     public function cancel($id)
@@ -259,6 +296,16 @@ class BookingController extends Controller
             'proof' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp,gif', 'max:5120'], // 5MB
         ]);
 
+        // No partial payments: amount must exactly match the stored snapshot due
+        $due = (float) ($booking->estimated_price ?? 0);
+        if ($due <= 0) {
+            return redirect('/booking/history')->with('error', 'No amount due is available for this booking.');
+        }
+        $amount = (float) $validated['amount_paid'];
+        if (abs($amount - $due) > 0.01) {
+            return redirect('/booking/history')->with('error', 'Partial payments are not allowed. Amount must match the total due.');
+        }
+
         $proofPath = null;
         if ($request->hasFile('proof')) {
             // Store on public disk so it can be served; requires `php artisan storage:link` once
@@ -285,8 +332,8 @@ class BookingController extends Controller
             $entry->declined_at = null;
 
             // Option B: Replace amounts (do NOT accumulate)
-            $entry->amount_received = (float)$validated['amount_paid'];
-            $entry->gross_total = (float)$validated['amount_paid'];
+            $entry->amount_received = $amount;
+            $entry->gross_total = $amount;
 
             // Preserve audit trail by appending context
             $entry->reference_notes = trim(
@@ -304,15 +351,15 @@ class BookingController extends Controller
             FinanceEntry::create([
                 'booking_id' => $booking->id,
                 'customer_name' => $booking->first_name . ' ' . $booking->last_name,
-                'gross_total' => $validated['amount_paid'],
+                'gross_total' => $amount,
                 'transaction_date' => now()->toDateString(),
-                'amount_received' => $validated['amount_paid'],
+                'amount_received' => $amount,
                 'payment_method' => 'Other', // GCash treated as other for now
                 'gateway_fee' => 0,
                 'tax_collected' => 0,
                 'reference_notes' => $notes,
                 'decline_reason' => null,
-                'net_revenue' => $validated['amount_paid'],
+                'net_revenue' => $amount,
                 'status' => 'Pending Review',
                 'created_by' => auth()->id(),
                 'reviewed_by' => null,
@@ -354,5 +401,21 @@ class BookingController extends Controller
         ];
 
         return $statusMap[$status] ?? 'Unknown';
+    }
+
+    /** Ensure mapped integer room IDs align with category prefix buckets. */
+    private function roomIdMatchesCategory(int $roomId, string $category): bool
+    {
+        $category = strtolower($category);
+        if ($category === 'individual') {
+            return $roomId >= 1001 && $roomId < 2000;
+        }
+        if ($category === 'common') {
+            return $roomId >= 2001 && $roomId < 3000;
+        }
+        if ($category === 'master') {
+            return $roomId >= 3001 && $roomId < 4000;
+        }
+        return false;
     }
 }

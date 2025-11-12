@@ -128,6 +128,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/admin/rooms/occupy', [\App\Http\Controllers\RoomManagementController::class, 'occupyRoom']);
         Route::post('/admin/rooms/extend', [\App\Http\Controllers\RoomManagementController::class, 'extendRoom']);
         Route::post('/admin/rooms/stop', [\App\Http\Controllers\RoomManagementController::class, 'stopRoom']);
+        // Note: availability endpoint is defined outside the admin group to allow normal users
         
     // Booking management - both admin and admin officer
         Route::post('/admin/bookings/{id}/approve', [\App\Http\Controllers\BookingController::class, 'approve']);
@@ -195,6 +196,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('feedback/{id}', [FeedbackController::class, 'destroy'])->name('admin.feedback.destroy');
     });
 });
+
+// Availability endpoint used by the booking schedule UI (requires auth but NOT admin)
+Route::middleware(['auth', 'verified'])->get('/rooms/available', [\App\Http\Controllers\RoomManagementController::class, 'getAvailableRooms']);
 
 // Serve the survey create page to match resources/js/pages/survey/Create.vue (requires auth)
 Route::get('/survey/create', function () {

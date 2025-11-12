@@ -110,10 +110,20 @@ const totalStats = computed(() => {
 });
 
 // Fetch individual rooms for a category from the backend
+const previewDate = ref<string>('');
+const previewStart = ref<string>('');
+const previewEnd = ref<string>('');
+
 const fetchIndividualRooms = async (category: RoomCategory) => {
     loading.value = true;
     try {
-        const response = await axios.get(`/admin/rooms/${category.category}`);
+        const params: Record<string, string> = {};
+        if (previewDate.value && previewStart.value && previewEnd.value) {
+            params.date = previewDate.value;
+            params.start_time = previewStart.value;
+            params.end_time = previewEnd.value;
+        }
+        const response = await axios.get(`/admin/rooms/${category.category}`, { params });
         return response.data;
     } catch (error) {
         console.error('Error fetching room data:', error);
@@ -190,6 +200,11 @@ const viewRooms = async (category: RoomCategory) => {
     
     // Fetch real room data from backend
     individualRooms.value = await fetchIndividualRooms(category);
+};
+
+const applyPreviewWindow = async () => {
+    if (!selectedCategory.value) return;
+    individualRooms.value = await fetchIndividualRooms(selectedCategory.value);
 };
 
 const editRooms = async (category: RoomCategory) => {
@@ -342,11 +357,17 @@ const confirmDeleteRoom = async () => {
 const occupyRoom = async (room: IndividualRoom) => {
     roomToOccupy.value = room;
     
-    // Reset form without pre-filled times
+    // Prefill with NOW and +1 hour to ensure walk-ins show as Occupied immediately
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const plusMinutes = (d: Date, m: number) => new Date(d.getTime() + m * 60000);
+    const start = now;
+    const end = plusMinutes(now, 60);
     occupyForm.value = {
         guestName: '',
-        startTime: '',
-        endTime: ''
+        startTime: hhmm(start),
+        endTime: hhmm(end)
     };
     
     showOccupyModal.value = true;
@@ -743,6 +764,26 @@ const confirmStopRoom = async () => {
                         {{ selectedCategory?.description }}
                     </DialogDescription>
                 </DialogHeader>
+        
+                <!-- Preview window controls -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-1">Date</label>
+                        <input type="date" v-model="previewDate" class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b]" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-1">Start time</label>
+                        <input type="time" v-model="previewStart" class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b]" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-[#4b824b] mb-1">End time</label>
+                        <input type="time" v-model="previewEnd" class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b]" />
+                    </div>
+                    <div class="flex gap-2">
+                        <Button class="bg-[#4b824b] text-white hover:bg-[#3a6a3a]" @click="applyPreviewWindow">Apply</Button>
+                        <Button variant="outline" class="border-[#4b824b] text-[#4b824b]" @click="() => { previewDate = ''; previewStart = ''; previewEnd = ''; applyPreviewWindow(); }">Reset</Button>
+                    </div>
+                </div>
                 
                 <!-- Category Stats (Large) -->
                 <div class="grid grid-cols-3 gap-6 mb-8">
