@@ -1,25 +1,21 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 import HeadingSmall from '@/components/HeadingSmall.vue';
-import { type BreadcrumbItem } from '@/types';
-
-import AppLayout from '@/layouts/AppLayout.vue';
+import AppHeaderLayout from '@/layouts/app/AppHeaderLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Appearance settings',
-        href: '/settings/appearance',
-    },
-];
+const page = usePage();
+const user = page.props.auth.user as any;
+const isAdmin = computed(() => ['admin', 'admin_officer'].includes((user?.role as any) ?? ''));
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbItems">
+    <component :is="isAdmin ? 'div' : AppHeaderLayout" :active="isAdmin ? undefined : 'home'">
         <Head title="Appearance settings" />
 
-        <SettingsLayout>
+        <SettingsLayout :hide-sidebar="!isAdmin">
             <div class="appearance-settings">
                 <HeadingSmall title="Appearance settings" description="Your application uses a consistent color scheme matching the WeCollab brand" />
                 
@@ -47,7 +43,7 @@ const breadcrumbItems: BreadcrumbItem[] = [
                 </div>
             </div>
         </SettingsLayout>
-    </AppLayout>
+    </component>
 </template>
 
 <style scoped>

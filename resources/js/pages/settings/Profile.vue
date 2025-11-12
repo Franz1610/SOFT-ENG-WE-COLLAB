@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 import DeleteUser from '@/components/DeleteUser.vue';
 import HeadingSmall from '@/components/HeadingSmall.vue';
@@ -7,9 +8,9 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AppLayout from '@/layouts/AppLayout.vue';
+import AppHeaderLayout from '@/layouts/app/AppHeaderLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { type BreadcrumbItem, type User } from '@/types';
+import { type User } from '@/types';
 
 interface Props {
     mustVerifyEmail: boolean;
@@ -18,22 +19,16 @@ interface Props {
 
 defineProps<Props>();
 
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: '/settings/profile',
-    },
-];
-
 const page = usePage();
 const user = page.props.auth.user as User;
+const isAdmin = computed(() => ['admin', 'admin_officer'].includes((user?.role as any) ?? ''));
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbItems">
+    <component :is="isAdmin ? 'div' : AppHeaderLayout" :active="isAdmin ? undefined : 'home'">
         <Head title="Profile settings" />
 
-        <SettingsLayout>
+        <SettingsLayout :hide-sidebar="!isAdmin">
             <div class="profile-settings">
                 <HeadingSmall title="Profile information" description="Update your name and email address" />
 
@@ -67,7 +62,7 @@ const user = page.props.auth.user as User;
                         <InputError class="form-error" :message="errors.email" />
                     </div>
 
-                    <div v-if="mustVerifyEmail && !user.email_verified_at" class="verification-notice">
+                    <div v-if="mustVerifyEmail && user && user.email_verified_at === null" class="verification-notice">
                         <p class="verification-text">
                             Your email address is unverified.
                             <Link
@@ -102,20 +97,20 @@ const user = page.props.auth.user as User;
 
             <DeleteUser />
         </SettingsLayout>
-    </AppLayout>
+    </component>
 </template>
 
 <style scoped>
 .profile-settings {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1rem;
 }
 
 .profile-form {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.75rem;
 }
 
 .form-group {
@@ -128,40 +123,40 @@ const user = page.props.auth.user as User;
 :deep(.heading-small-container) {
     background: #4b824b !important;
     color: #FFFAE9 !important;
-    padding: 1.5rem !important;
-    border-radius: 12px !important;
-    margin-bottom: 1.5rem !important;
+    padding: 1rem !important;
+    border-radius: 10px !important;
+    margin-bottom: 0.75rem !important;
 }
 
 :deep(.heading-small-title) {
     color: #FFFAE9 !important;
-    font-size: 1.25rem !important;
+    font-size: 1rem !important;
     font-weight: 600 !important;
-    margin-bottom: 0.5rem !important;
+    margin-bottom: 0.25rem !important;
 }
 
 :deep(.heading-small-description) {
     color: #FFFAE9 !important;
-    opacity: 0.9 !important;
-    font-size: 0.875rem !important;
+    opacity: 0.95 !important;
+    font-size: 0.8rem !important;
 }
 
 /* Label styling */
 :deep(.form-label) {
     font-weight: 500 !important;
     color: #4b824b !important;
-    font-size: 0.875rem !important;
-    margin-bottom: 0.5rem !important;
+    font-size: 0.8rem !important;
+    margin-bottom: 0.35rem !important;
 }
 
 /* Input field styling */
 :deep(.form-input) {
-    padding: 0.75rem 1rem !important;
+    padding: 0.5rem 0.75rem !important;
     border: 2px solid #4b824b !important;
-    border-radius: 12px !important;
+    border-radius: 10px !important;
     background: #FFFAE9 !important;
     color: #4b824b !important;
-    font-size: 1rem !important;
+    font-size: 0.95rem !important;
     transition: all 0.2s ease !important;
     width: 100% !important;
     box-shadow: none !important;
@@ -222,7 +217,7 @@ const user = page.props.auth.user as User;
 .form-actions {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
 }
 
 /* Button styling with high specificity */
@@ -231,8 +226,8 @@ const user = page.props.auth.user as User;
     background: #4b824b !important;
     color: #FFFAE9 !important;
     border: 2px solid #4b824b !important;
-    padding: 0.75rem 1.5rem !important;
-    border-radius: 12px !important;
+    padding: 0.55rem 1rem !important;
+    border-radius: 10px !important;
     font-weight: 500 !important;
     transition: all 0.2s ease !important;
     box-shadow: none !important;
@@ -263,6 +258,11 @@ const user = page.props.auth.user as User;
 
 /* Override any global button styles */
 :deep(button) {
-    border-radius: 12px !important;
+    border-radius: 10px !important;
+}
+
+/* Reduce card padding for this page so content fits without scrolling */
+:deep(.settings-section) {
+    padding: 1.25rem !important;
 }
 </style>

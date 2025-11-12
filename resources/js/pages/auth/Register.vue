@@ -43,7 +43,17 @@
           </div>
           <div>
             <label for="contact" class="block font-semibold mb-1">Contact Number</label>
-            <input id="contact" name="contact" type="text" required class="w-full border rounded px-3 py-1.5 text-sm" />
+            <input
+              id="contact"
+              name="contact"
+              type="tel"
+              inputmode="numeric"
+              pattern="[0-9]{11}"
+              maxlength="11"
+              required
+              class="w-full border rounded px-3 py-1.5 text-sm"
+              @input="sanitizeContactInput"
+            />
             <div v-if="errors.contact" class="text-red-500 text-xs mt-1">{{ errors.contact }}</div>
           </div>
           <div>
@@ -74,6 +84,11 @@
 <script setup lang="ts">
 import { Form } from '@inertiajs/vue3';
 import { ref } from 'vue';
+function sanitizeContactInput(event: Event) {
+  const target = event.target as HTMLInputElement | null;
+  if (!target) return;
+  target.value = target.value.replace(/[^0-9]/g, '').slice(0, 11);
+}
 function goHome() {
   window.location.href = '/';
 }

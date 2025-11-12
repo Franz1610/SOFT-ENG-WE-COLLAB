@@ -53,7 +53,8 @@
         <div class="w-full">
           <div class="bg-gray-200 rounded-lg overflow-hidden">
             <!-- Table Header -->
-            <div class="grid grid-cols-4 gap-4 p-4 bg-gray-300 font-semibold text-gray-700 text-sm">
+            <div class="grid grid-cols-5 gap-4 p-4 bg-gray-300 font-semibold text-gray-700 text-sm">
+              <div>ID</div>
               <div>DATE</div>
               <div>CATEGORY</div>
               <div>TIME</div>
@@ -65,10 +66,19 @@
               <div 
                 v-for="booking in paginatedBookings" 
                 :key="booking.id"
-                class="grid grid-cols-4 gap-4 p-4 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                class="grid grid-cols-5 gap-4 p-4 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
               >
+                <div>
+                  <button 
+                    class="id-link"
+                    @click="openDetailsModal(booking)"
+                    :title="`View details for #${booking.id}`"
+                  >
+                    #{{ booking.id }}
+                  </button>
+                </div>
                 <div>{{ booking.date }}</div>
-                <div>{{ booking.category }}</div>
+                <div>{{ formatCategory(booking.category) }}</div>
                 <div>{{ booking.time }}</div>
                 <div class="status-cell">
                   <span
@@ -209,6 +219,55 @@
       </DialogContent>
     </Dialog>
 
+    <!-- Booking Details Modal -->
+    <Dialog :open="showDetailsModal" @update:open="closeDetailsModal">
+      <DialogContent class="sm:max-w-md bg-white">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Booking Details
+          </DialogTitle>
+          <DialogDescription v-if="selectedBooking" class="text-center text-gray-600 mt-2">
+            Booking #{{ selectedBooking.id }}
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="selectedBooking" class="details-grid">
+          <div class="label">Date</div>
+          <div class="value">{{ selectedBooking.date }}</div>
+          <div class="label">Category</div>
+          <div class="value">{{ formatCategory(selectedBooking.category) }}</div>
+          <div class="label">Time</div>
+          <div class="value">{{ selectedBooking.time }}</div>
+          <template v-if="selectedBooking.duration_hours">
+            <div class="label">Duration</div>
+            <div class="value">{{ selectedBooking.duration_hours }} hour{{ selectedBooking.duration_hours > 1 ? 's' : '' }}</div>
+          </template>
+          <template v-if="selectedBooking.estimated_price">
+            <div class="label">Price (estimated)</div>
+            <div class="value">{{ formatCurrency(Number(selectedBooking.estimated_price)) }}</div>
+          </template>
+          <div class="label">Status</div>
+          <div class="value">
+            <span :class="['status-badge', getStatusClass(selectedBooking.status || '')]">
+              {{ selectedBooking.status }}
+            </span>
+          </div>
+          <template v-if="selectedBooking.decline_reason">
+            <div class="label">Reason</div>
+            <div class="value">{{ selectedBooking.decline_reason }}</div>
+          </template>
+        </div>
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button 
+            variant="outline" 
+            @click="closeDetailsModal"
+            class="border-[#495846] text-[#495846]"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <!-- Pay Modal (QR + payment form) -->
     <Dialog :open="showPayModal" @update:open="closePayModal">
       <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white pay-dialog">
@@ -294,6 +353,9 @@ const showLogoutModal = ref(false);
 const menuOpen = ref(false);
 const showCancelModal = ref(false);
 const bookingToCancel = ref<number | null>(null);
+// Details modal state
+const showDetailsModal = ref(false);
+const selectedBooking = ref<any | null>(null);
 // Pay modal state
 const showPayModal = ref(false);
 const payBookingId = ref<number | null>(null);
@@ -329,10 +391,10 @@ const allowedAmounts = computed<AmountOption[]>(() => {
     nums.map(n => ({ label: `PHP ${n.toFixed(2)}${suffix}`, value: String(n) }));
 
   if (cat.includes('individual') || cat.includes('indiv')) {
-    return make([39, 99, 195, 245]);
+    return make([70, 120, 150, 200]);
   }
   if (cat.includes('common')) {
-    return make([70, 120, 150, 200]);
+    return make([39, 99, 195, 245]);
   }
   if (cat.includes('master')) {
     return make([200, 300], '/hr');
@@ -340,6 +402,17 @@ const allowedAmounts = computed<AmountOption[]>(() => {
   // Fallback: no predefined options
   return [];
 });
+
+// Human-friendly category labels for Booking History table only
+function formatCategory(category: unknown) {
+  const c = (category ?? '').toString().toLowerCase();
+  if (c.includes('common')) return 'Regular tables';
+  if (c.includes('individual') || c.includes('indiv')) return 'Phone booth rooms';
+  if (c.includes('master')) return 'Conference rooms';
+  // Fallback to original (proper-cased if possible)
+  if (typeof category === 'string' && category.length) return category;
+  return '—';
+}
 
 // Get status styling class
 function getStatusClass(status: string) {
@@ -401,6 +474,16 @@ function openPayModal(bookingId: number) {
   if (!bookingId) return;
   payBookingId.value = bookingId;
   showPayModal.value = true;
+}
+
+// Open booking details modal
+function openDetailsModal(booking: any) {
+  selectedBooking.value = booking;
+  showDetailsModal.value = true;
+}
+function closeDetailsModal() {
+  showDetailsModal.value = false;
+  selectedBooking.value = null;
 }
 
 // Redirect user to booking page to create a new booking after rejection
@@ -730,12 +813,43 @@ main.main-content {
   color: #495846;
   font-weight: 500;
 }
+/* ID clickable link style */
+.id-link {
+  color: #495846;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.id-link:hover {
+  opacity: 0.85;
+}
+/* Details modal layout */
+.details-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0.5rem 0.75rem;
+  padding: 0.5rem 0.25rem 0.25rem;
+}
+.details-grid .label {
+  color: #374151;
+  font-weight: 600;
+}
+.details-grid .value {
+  color: #111827;
+}
 /* Responsive design */
 @media (max-width: 900px) {
   .main-content {
     padding: 1em 0.5em;
   }
   .grid-cols-4 {
+    grid-template-columns: 1fr 1fr;
+    gap: 2;
+  }
+  .grid-cols-5 {
     grid-template-columns: 1fr 1fr;
     gap: 2;
   }

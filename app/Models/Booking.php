@@ -22,6 +22,8 @@ class Booking extends Model
         'end_time',
         'status',
         'reminder_sent_at',
+        'duration_hours',
+        'estimated_price',
     ];
 
     protected $casts = [
@@ -29,6 +31,7 @@ class Booking extends Model
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
         'reminder_sent_at' => 'datetime',
+        'estimated_price' => 'decimal:2',
     ];
 
     public function user(): BelongsTo

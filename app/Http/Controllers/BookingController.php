@@ -15,7 +15,7 @@ class BookingController extends Controller
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'contact' => 'required|string|max:255',
+            'contact' => ['required','digits:11'],
             'email' => 'required|email|max:255',
             'additional_info' => 'nullable|string',
             'pax' => 'required|integer|min:1',
@@ -55,6 +55,18 @@ class BookingController extends Controller
             return back()->with('error', 'Selected time overlaps with an existing booking for this room.');
         }
 
+        // Compute duration in whole hours (per business rule)
+        $start = \Carbon\Carbon::createFromFormat('H:i:s', $startTime);
+        $end = \Carbon\Carbon::createFromFormat('H:i:s', $endTime);
+        $durationHours = max(1, (int) floor($end->diffInMinutes($start) / 60));
+
+        // Compute price snapshot based on promo
+        $estimatedPrice = $this->computeEstimatedPrice(
+            $validated['category'],
+            $durationHours,
+            (int) $validated['pax']
+        );
+
         $booking = Booking::create([
             'user_id' => auth()->id(),
             'first_name' => $validated['first_name'],
@@ -69,10 +81,36 @@ class BookingController extends Controller
             'start_time' => $startTime,
             'end_time' => $endTime,
             'status' => 'pending', // Mark as pending when created - requires admin approval
+            'duration_hours' => $durationHours,
+            'estimated_price' => $estimatedPrice,
         ]);
 
         // Return to booking history so user can see the pending booking
         return redirect('/booking/history')->with('success', 'Booking submitted successfully! Please wait for admin approval.');
+    }
+
+    /**
+     * Compute the promo-based estimated price snapshot.
+     */
+    private function computeEstimatedPrice(string $category, int $durationHours, int $pax): ?float
+    {
+        $category = strtolower($category);
+        // Phone booth rooms (individual)
+        if ($category === 'individual') {
+            $map = [1 => 70, 2 => 120, 3 => 150, 4 => 200];
+            return $map[$durationHours] ?? null;
+        }
+        // Regular tables (common)
+        if ($category === 'common') {
+            $map = [1 => 39, 3 => 99, 6 => 195, 8 => 245];
+            return $map[$durationHours] ?? null;
+        }
+        // Conference rooms (master) per hour, pax bracketed
+        if ($category === 'master') {
+            $perHour = $pax <= 6 ? 200 : 300;
+            return $perHour * max(1, $durationHours);
+        }
+        return null;
     }
 
     public function getUserBookings()
@@ -96,6 +134,8 @@ class BookingController extends Controller
                     'paid' => $paid,
                     'decline_reason' => $rejected ? $finance->decline_reason : null,
                     'can_cancel' => $booking->status === 'pending' && $booking->booking_date >= now()->toDateString(),
+                    'duration_hours' => $booking->duration_hours,
+                    'estimated_price' => $booking->estimated_price,
                 ];
             });
 

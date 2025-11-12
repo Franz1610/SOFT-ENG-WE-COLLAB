@@ -1,45 +1,7 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
     <!-- Header -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo">WECOLLAB</div>
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link">What's NEW?</a>
-          <span class="nav-link active">Booking</span>
-          <Link href="/" class="nav-link">HOME</Link>
-        </nav>
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
-          <span class="nav-link active" @click="menuOpen = false">Booking</span>
-          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="booking" @auth="handleAuthAction" />
 
     <!-- Main Content -->
     <main class="main-content flex-1 flex flex-col items-center justify-start px-2 py-8 md:py-12">
@@ -79,7 +41,9 @@
                   v-model="form.contact" 
                   type="tel" 
                   autocomplete="tel" 
-                  pattern="[0-9]*"
+                  pattern="[0-9]{11}"
+                  inputmode="numeric"
+                  maxlength="11"
                   @input="validateContactNumber"
                   required 
                 />
@@ -212,7 +176,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ref, computed, onMounted } from 'vue';
-import { router, Link, usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
+import AppHeader from '@/components/AppHeader.vue'
 
 // Get props from backend
 interface RoomCategory {
@@ -241,8 +206,7 @@ const isLoggedIn = computed(() => !!user.value);
 
 // Modal state
 const showLogoutModal = ref(false);
-// Mobile menu state
-const menuOpen = ref(false);
+// Mobile menu handled by AppHeader
 const showRoomAlert = ref(false);
 const roomsBlinking = ref(false);
 
@@ -375,7 +339,7 @@ function selectRoom(id: number) {
 function validateContactNumber(event: Event) {
   const target = event.target as HTMLInputElement;
   // Remove any non-numeric characters
-  target.value = target.value.replace(/[^0-9]/g, '');
+  target.value = target.value.replace(/[^0-9]/g, '').slice(0, 11);
   // Update the form value
   form.value.contact = target.value;
 }
@@ -440,6 +404,12 @@ function submitBooking() {
   // Get the category from the selected room
   const selectedRoomData = rooms.value.find(room => room.id === selectedRoom.value);
   const category = selectedRoomData?.category || 'individual';
+
+  // Enforce contact to be exactly 11 digits
+  if (!/^\d{11}$/.test(form.value.contact)) {
+    alert('Please enter a valid 11-digit contact number.');
+    return;
+  }
 
   // Store booking data in session storage for the next page
   const bookingData = {
@@ -677,7 +647,27 @@ main.main-content {
   .grid-cols-3 {
     grid-template-columns: 1fr !important;
   }
+  /* Match Home page header behavior on small screens */
+  .header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
   .nav { display: none; }
   .hamburger-btn { display: inline-flex; align-items: center; justify-content: center; }
+  .main-content { padding: 0; }
+}
+
+/* Match Home page responsive paddings for consistent spacing */
+@media (max-width: 1200px) {
+  .header-inner {
+    padding: 0.5rem 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-inner {
+    padding: 0.5rem 0.5rem;
+  }
 }
 </style>

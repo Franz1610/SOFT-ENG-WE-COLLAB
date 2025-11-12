@@ -212,3 +212,9 @@ Route::middleware(['auth'])->group(function () {
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 
+// User-only profile page (separate from admin settings)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/profile', [\App\Http\Controllers\User\ProfileController::class, 'edit'])->name('user.profile.edit');
+    Route::patch('/profile', [\App\Http\Controllers\User\ProfileController::class, 'update'])->name('user.profile.update');
+});
+

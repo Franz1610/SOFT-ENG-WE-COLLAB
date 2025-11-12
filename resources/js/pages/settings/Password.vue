@@ -1,32 +1,28 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
-import AppLayout from '@/layouts/AppLayout.vue';
+import AppHeaderLayout from '@/layouts/app/AppHeaderLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
-import { Form, Head } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Form, Head, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 import HeadingSmall from '@/components/HeadingSmall.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { type BreadcrumbItem } from '@/types';
 
-const breadcrumbItems: BreadcrumbItem[] = [
-    {
-        title: 'Password settings',
-        href: '/settings/password',
-    },
-];
+const page = usePage();
+const user = page.props.auth.user as any;
+const isAdmin = computed(() => ['admin', 'admin_officer'].includes((user?.role as any) ?? ''));
 
 const passwordInput = ref<HTMLInputElement | null>(null);
 const currentPasswordInput = ref<HTMLInputElement | null>(null);
 </script>
 
 <template>
-    <AppLayout :breadcrumbs="breadcrumbItems">
+    <component :is="isAdmin ? 'div' : AppHeaderLayout" :active="isAdmin ? undefined : 'home'">
         <Head title="Password settings" />
 
-        <SettingsLayout>
+        <SettingsLayout :hide-sidebar="!isAdmin">
             <div class="password-settings">
                 <HeadingSmall title="Update password" description="Ensure your account is using a long, random password to stay secure" />
 
@@ -97,7 +93,7 @@ const currentPasswordInput = ref<HTMLInputElement | null>(null);
                 </Form>
             </div>
         </SettingsLayout>
-    </AppLayout>
+    </component>
 </template>
 
 <style scoped>

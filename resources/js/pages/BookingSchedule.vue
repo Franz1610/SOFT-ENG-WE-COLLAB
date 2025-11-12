@@ -105,7 +105,10 @@
             </select>
             <p class="text-xs text-neutral-500 mt-1" v-if="!isConferenceCategory">End time is computed from start time and duration.</p>
             <p class="text-xs text-green-700 mt-1" v-else>
-              Promo rate applied for conference rooms ({{ conferencePromoTier }} pax bracket). Duration is fixed.
+              Conference rooms are per-hour ({{ conferencePromoTier }} pax bracket).
+            </p>
+            <p class="text-sm mt-2" style="color:#495846" v-if="priceBlurb">
+              {{ priceBlurb }}
             </p>
           </div>
 
@@ -194,6 +197,14 @@
             <div class="flex justify-between items-center">
               <span class="font-medium" style="color: #495846;">End Time:</span>
               <span class="font-semibold" style="color: #495846;">{{ formatTimeDisplay(form.endTime) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Duration:</span>
+              <span class="font-semibold" style="color: #495846;">{{ form.durationHours }} hour{{ parseInt(form.durationHours) > 1 ? 's' : '' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Price Estimate:</span>
+              <span class="font-semibold" style="color: #495846;">{{ estimatedPriceDisplay }}</span>
             </div>
           </div>
         </div>
@@ -325,6 +336,7 @@ import { router, usePage, Link } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getDurationOptions, computePrice, formatPHP } from '@/utils/promo';
 import {
   Dialog,
   DialogContent,
@@ -367,8 +379,8 @@ const currentTimeDisplay = ref('');
 const minimumTimeDisplay = ref('');
 let timeUpdateInterval: number | null = null;
 
-// Allowed durations (in hours). Adjust if business rules change.
-const allowedDurations = ref<number[]>([1, 2, 3, 4]);
+// Allowed durations (in hours). Sourced from promo rules per category
+const allowedDurations = ref<number[]>([1]);
 
 // Payment context (best-effort detection from Inertia props)
 const paymentType = computed(() => {
@@ -406,12 +418,8 @@ watch([
   if (!form.value.startTime.hour || !form.value.startTime.minute) return;
   const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
   const startMinute = parseInt(form.value.startTime.minute);
-  // For conference rooms, duration is fixed by promo tier: could be 1 hour (1–6 pax) or 2 hours (7–10 pax)
-  let duration = parseInt(form.value.durationHours);
-  if (isConferenceCategory.value) {
-    duration = bookingPax.value <= 6 ? 1 : 2; // adjust business rule here if necessary
-    form.value.durationHours = String(duration);
-  }
+  // Determine duration from selection (conference rooms are per-hour; no forced lock)
+  const duration = parseInt(form.value.durationHours);
   if (isNaN(duration) || duration <= 0) return;
   const endTotalMinutes = startHour24 * 60 + startMinute + duration * 60;
   const endHour24 = Math.floor(endTotalMinutes / 60) % 24;
@@ -531,10 +539,11 @@ function roundUpToSlot(totalMinutes: number, slotSize: number): number {
   return Math.ceil(totalMinutes / slotSize) * slotSize;
 }
 
-// Recompute allowed durations based on start time and rule: end must stay same day, same minutes.
+// Recompute allowed durations based on start time, end-of-day constraint, and promo rules
 function recomputeAllowedDurations() {
   if (!form.value.startTime.hour || !form.value.startTime.minute) {
-    allowedDurations.value = [1, 2, 3, 4];
+    // Use promo defaults without time constraint when time not yet selected
+    allowedDurations.value = getDurationOptions(bookingCategory.value, 8);
     return;
   }
   const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
@@ -548,14 +557,9 @@ function recomputeAllowedDurations() {
   }
   const MAX_CAP = 8; // business cap; adjust as needed
   maxHours = Math.min(maxHours, MAX_CAP);
-  // If conference, lock duration to promo tier (1–6 pax => 1h, 7–10 pax => 2h) but not beyond maxHours
-  if (isConferenceCategory.value) {
-    const tierHours = bookingPax.value <= 6 ? 1 : 2;
-    const finalHours = Math.min(tierHours, maxHours);
-    allowedDurations.value = finalHours >= 1 ? [finalHours] : [];
-  } else {
-    allowedDurations.value = Array.from({ length: maxHours }, (_, i) => i + 1);
-  }
+  // Pull promo-based options and then enforce time boundary
+  const fromPromo = getDurationOptions(bookingCategory.value, maxHours);
+  allowedDurations.value = fromPromo.filter(h => h <= maxHours);
 
   // Ensure selected duration is still valid
   const current = parseInt(form.value.durationHours || '1');
@@ -662,11 +666,7 @@ function submitSchedule() {
   }
 
   // Ensure durationHours produces current endTime correctly (redundant but defensive)
-  let durationH = parseInt(form.value.durationHours);
-  if (isConferenceCategory.value) {
-    durationH = bookingPax.value <= 6 ? 1 : 2;
-    form.value.durationHours = String(durationH);
-  }
+  const durationH = parseInt(form.value.durationHours);
   if (isNaN(durationH) || durationH < 1) {
     alert('Invalid duration selected.');
     return;
@@ -953,6 +953,31 @@ function handleAuthAction() {
     router.visit('/login');
   }
 }
+
+// Pricing blurb displayed under Duration, based on current selection and promo
+const priceBlurb = computed(() => {
+  const dur = parseInt(form.value.durationHours || '0');
+  if (!dur) return '';
+  const cat = bookingCategory.value;
+  if (cat === 'master') {
+    const perHour = bookingPax.value <= 6 ? 200 : 300;
+    const est = computePrice(cat, dur, bookingPax.value);
+    return `Rate: ${formatPHP(perHour)} / hr • Estimated: ${formatPHP(est)}`;
+  }
+  const price = computePrice(cat, dur, bookingPax.value);
+  return price ? `Promo price: ${formatPHP(price)}` : '';
+});
+
+// Price estimate for the confirmation modal
+const estimatedPrice = computed(() => {
+  const dur = parseInt(form.value.durationHours || '0');
+  if (!dur) return null;
+  return computePrice(bookingCategory.value, dur, bookingPax.value);
+});
+const estimatedPriceDisplay = computed(() => {
+  const val = estimatedPrice.value;
+  return val == null ? '—' : formatPHP(val);
+});
 </script>
 
 <style scoped>

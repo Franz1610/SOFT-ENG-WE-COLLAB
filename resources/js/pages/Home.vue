@@ -1,47 +1,6 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo">WECOLLAB</div>
-        <!-- Hamburger button (visible on small screens) -->
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <Link href="/whats-new" class="nav-link">What's NEW?</Link>
-          <Link href="/booking" class="nav-link">Booking</Link>
-          <span class="nav-link active">HOME</span>
-        </nav>
-        <!-- Mobile menu that appears when hamburger is toggled -->
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <Link href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</Link>
-          <Link href="/booking" class="nav-link" @click="menuOpen = false">Booking</Link>
-          <span class="nav-link active" @click="menuOpen = false">HOME</span>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="home" @auth="handleAuthAction" />
     <main class="main-content">
       <div class="hero">
         <div class="hero-center">
@@ -661,7 +620,8 @@ section > .testimonial-slide {
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Link, usePage } from '@inertiajs/vue3'
+import { usePage } from '@inertiajs/vue3'
+import AppHeader from '@/components/AppHeader.vue'
 import {
   Dialog,
   DialogContent,
@@ -679,8 +639,7 @@ const user = computed(() => page.props.auth.user);
 // Modal state
 const showLogoutModal = ref(false);
 
-// Mobile menu state for small screens
-const menuOpen = ref(false);
+// Mobile menu handled by AppHeader
 
 function closeLogoutModal() {
   showLogoutModal.value = false;
