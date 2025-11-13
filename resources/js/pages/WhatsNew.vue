@@ -1,47 +1,7 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
-    <!-- Header Navigation -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo" @click="goHome">WECOLLAB</div>
-        <!-- Hamburger button for small screens -->
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <span class="nav-link active">What's NEW?</span>
-          <Link href="/booking" class="nav-link">Booking</Link>
-          <Link href="/" class="nav-link">HOME</Link>
-        </nav>
-        <!-- Mobile menu -->
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <span class="nav-link active" @click="menuOpen = false">What's NEW?</span>
-          <Link href="/booking" class="nav-link" @click="menuOpen = false">Booking</Link>
-          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
-        </div>
-      </div>
-    </header>
+    <!-- Shared site header -->
+    <AppHeader :user="user" active="whatsnew" @auth="handleAuthAction" />
 
     <!-- What's New Content -->
     <main class="whats-new-content">
@@ -119,7 +79,7 @@
 </template>
 
 <script setup>
-import { Link, router, usePage } from '@inertiajs/vue3'
+import { router, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -130,6 +90,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import AppHeader from '@/components/AppHeader.vue'
 
 // Get authentication data from Inertia page props
 const page = usePage()
@@ -137,9 +98,6 @@ const user = computed(() => page.props.auth?.user)
 
 // Modal state
 const showLogoutModal = ref(false)
-
-// Mobile menu state
-const menuOpen = ref(false)
 
 // Handle authentication actions
 const handleAuthAction = () => {

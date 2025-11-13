@@ -1,13 +1,8 @@
 <script setup lang="ts">
-import InputError from '@/components/InputError.vue';
-import TextLink from '@/components/TextLink.vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import AuthLayout from '@/layouts/AuthLayout.vue';
 import { Form, Head } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import AppHeader from '@/components/AppHeader.vue';
 
 defineProps<{
     status?: string;
@@ -37,38 +32,56 @@ function onSubmit() {
 </script>
 
 <template>
-    <AuthLayout title="Forgot password" description="Enter your email to receive a password reset link">
+    <div style="background: url('/images/homepage/hero.png') center/cover no-repeat fixed; min-height: 100vh; width: 100vw;">
         <Head title="Forgot password" />
+        <AppHeader :user="null" active="forgot" />
 
-        <div v-if="status" class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
-            {{ status }}
-        </div>
+        <main class="main-content flex items-center justify-center min-h-screen" style="background: rgba(0,0,0,0.55);">
+            <div class="fp-card bg-white bg-opacity-90 rounded-2xl shadow-lg p-6 w-full max-w-sm flex flex-col items-center">
+                <h1 class="text-3xl font-bold mb-2 text-center">Forgot password</h1>
+                <p class="text-sm text-neutral-700 mb-4 text-center">Enter your email to receive a password reset link</p>
 
-        <div class="space-y-6">
-            <Form method="post" :action="route('password.email')" v-slot="{ errors, processing }" @submit="onSubmit">
-                <div class="grid gap-2">
-                    <Label for="email">Email address</Label>
-                    <Input id="email" type="email" name="email" v-model="emailInput" autocomplete="off" autofocus placeholder="email@example.com" />
-                    <InputError :message="errors.email" />
+                <div v-if="status" class="w-full mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-center text-sm font-medium text-emerald-700">
+                    {{ status }}
                 </div>
 
-                <div class="my-6 flex items-center justify-start">
-                    <Button class="w-full" :disabled="processing || resendCooldown > 0">
-                        <LoaderCircle v-if="processing" class="h-4 w-4 animate-spin" />
-                        <span v-else>Email password reset link</span>
-                        <span v-if="resendCooldown > 0" class="ml-2 text-xs opacity-80">({{ resendCooldown }}s)</span>
-                    </Button>
+                <Form method="post" :action="route('password.email')" v-slot="{ errors, processing }" @submit="onSubmit" class="w-full flex flex-col gap-3">
+                    <div>
+                        <label for="email" class="block font-semibold mb-1">Email address</label>
+                        <input id="email" type="email" name="email" v-model="emailInput" autofocus autocomplete="off" placeholder="email@example.com" class="w-full border rounded px-3 py-2" />
+                        <div v-if="errors.email" class="text-red-500 text-xs mt-1">{{ errors.email }}</div>
+                    </div>
+
+                    <button type="submit" :disabled="processing || resendCooldown > 0" class="w-full py-2 rounded bg-black text-white font-semibold text-base hover:bg-neutral-800 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        <span class="inline-flex items-center justify-center gap-2">
+                            <LoaderCircle v-if="processing" class="h-4 w-4 animate-spin" />
+                            <span v-else>Email password reset link</span>
+                            <span v-if="resendCooldown > 0" class="text-xs opacity-80">({{ resendCooldown }}s)</span>
+                        </span>
+                    </button>
+                </Form>
+
+                <div v-if="inboxHref" class="text-center text-sm mt-2">
+                    <a :href="inboxHref" target="_blank" rel="noopener" class="text-blue-700 hover:underline">Open inbox</a>
                 </div>
-            </Form>
 
-            <div v-if="inboxHref" class="text-center text-sm mb-3">
-                <a :href="inboxHref" target="_blank" rel="noopener" class="underline">Open inbox</a>
+                <div class="text-center text-sm text-neutral-800 mt-2">
+                    Or, return to <a :href="route('login')" class="hover:underline">log in</a>
+                </div>
             </div>
-
-            <div class="space-x-1 text-center text-sm text-muted-foreground">
-                <span>Or, return to</span>
-                <TextLink :href="route('login')">log in</TextLink>
-            </div>
-        </div>
-    </AuthLayout>
+        </main>
+    </div>
 </template>
+
+<style scoped>
+main.main-content {
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    margin-top: 54px;
+}
+.fp-card {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.13), 0 2px 8px rgba(0,0,0,0.10);
+}
+</style>
