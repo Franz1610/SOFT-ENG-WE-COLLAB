@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, usePage, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Building, MapPin, Users, Wifi, Monitor, Coffee, Car, User, Clock, DollarSign, RefreshCw } from 'lucide-vue-next';
+import { Building, Users, Wifi, Monitor, Coffee, Car, User, Clock, RefreshCw } from 'lucide-vue-next';
 import { ref, computed, watch, onUnmounted } from 'vue';
 import axios from 'axios';
 
@@ -185,20 +185,7 @@ watch(showIndividualRooms, (open) => {
 
 onUnmounted(() => clearAutoRefreshTimers());
 
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'Available':
-            return 'bg-green-100 text-green-800 border-green-200';
-        case 'Occupied':
-            return 'bg-red-100 text-red-800 border-red-200';
-        case 'Reserved':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'Maintenance':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        default:
-            return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-};
+// Removed unused getStatusColor helper
 
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -240,10 +227,7 @@ const viewRooms = async (category: RoomCategory) => {
     individualRooms.value = await fetchIndividualRooms(category);
 };
 
-const applyPreviewWindow = async () => {
-    if (!selectedCategory.value) return;
-    individualRooms.value = await fetchIndividualRooms(selectedCategory.value);
-};
+// Removed preview window apply helper as preview controls were removed
 
 const editRooms = async (category: RoomCategory) => {
     selectedCategory.value = category;
@@ -347,7 +331,7 @@ const confirmDeleteRoom = async () => {
     console.log('Attempting to delete room:', roomToDelete.value.number, 'in category:', selectedCategory.value?.category);
     
     try {
-        const response = await axios.delete(`/admin/rooms/delete`, {
+        await axios.delete(`/admin/rooms/delete`, {
             data: {
                 category: selectedCategory.value?.category,
                 room_number: roomToDelete.value.number
@@ -797,31 +781,13 @@ const confirmStopRoom = async () => {
         <Dialog v-model:open="showIndividualRooms">
             <DialogContent class="max-w-[98vw] w-[98vw] h-[95vh] max-h-[95vh] p-10 bg-[#FFFAE9] border-2 border-[#4b824b] sm:max-w-[98vw]">
                 <DialogHeader class="mb-6">
-                    <DialogTitle class="text-3xl text-[#4b824b] font-bold">{{ selectedCategory?.name }} Rooms</DialogTitle>
+                    <DialogTitle class="text-3xl text-[#4b824b] font-bold">{{ selectedCategory?.name }}</DialogTitle>
                     <DialogDescription class="text-lg text-[#344C34] mt-2">
                         {{ selectedCategory?.description }}
                     </DialogDescription>
                 </DialogHeader>
         
-                <!-- Preview window controls -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end mb-6">
-                    <div>
-                        <label class="block text-sm font-medium text-[#4b824b] mb-1">Date</label>
-                        <input type="date" v-model="previewDate" class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b]" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[#4b824b] mb-1">Start time</label>
-                        <input type="time" v-model="previewStart" class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b]" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[#4b824b] mb-1">End time</label>
-                        <input type="time" v-model="previewEnd" class="w-full p-2 border border-[#4b824b] rounded-md bg-white text-[#4b824b]" />
-                    </div>
-                    <div class="flex gap-2">
-                        <Button class="bg-[#4b824b] text-white hover:bg-[#3a6a3a]" @click="applyPreviewWindow">Apply</Button>
-                        <Button variant="outline" class="border-[#4b824b] text-[#4b824b]" @click="() => { previewDate = ''; previewStart = ''; previewEnd = ''; applyPreviewWindow(); }">Reset</Button>
-                    </div>
-                </div>
+                <!-- Removed date/time preview controls per request -->
                 
                 <!-- Category Stats (Large) -->
                 <div class="grid grid-cols-3 gap-6 mb-8">
