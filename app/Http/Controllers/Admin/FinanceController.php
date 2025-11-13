@@ -120,11 +120,12 @@ class FinanceController extends Controller
 
     public function store(Request $request)
     {
+        // Limit allowed payment methods to Cash and Gcash to match database enum
         $request->validate([
             'booking_id' => 'required|exists:bookings,id|unique:finance_entries,booking_id',
             'transaction_date' => 'required|date|before_or_equal:today',
             'amount_received' => 'required|numeric|min:0',
-            'payment_method' => 'required|in:Credit Card,Bank Transfer,Cash,Gift Card,Other',
+            'payment_method' => 'required|in:Cash,Gcash',
             'gateway_fee' => 'nullable|numeric|min:0',
             'tax_collected' => 'nullable|numeric|min:0',
             'reference_notes' => 'required|string',

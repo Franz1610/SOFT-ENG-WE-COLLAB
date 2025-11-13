@@ -352,13 +352,15 @@ class BookingController extends Controller
 
             $entry->save();
         } else {
+            // Use allowed enum values (Cash, Gcash). GCash submissions are marked as 'Gcash'.
             FinanceEntry::create([
                 'booking_id' => $booking->id,
                 'customer_name' => $booking->first_name . ' ' . $booking->last_name,
                 'gross_total' => $amount,
                 'transaction_date' => now()->toDateString(),
                 'amount_received' => $amount,
-                'payment_method' => 'Other', // GCash treated as other for now
+                // Set payment method to the DB-allowed enum. The app treats GCash as Gcash.
+                'payment_method' => 'Gcash',
                 'gateway_fee' => 0,
                 'tax_collected' => 0,
                 'reference_notes' => $notes,
