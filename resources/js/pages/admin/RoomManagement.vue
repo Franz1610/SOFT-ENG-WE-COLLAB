@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Building, MapPin, Users, Wifi, Monitor, Coffee, Car, User, Clock, DollarSign, RefreshCw } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import axios from 'axios';
 
 // Type definitions
@@ -137,15 +137,53 @@ const fetchIndividualRooms = async (category: RoomCategory) => {
 const refreshRoomData = async () => {
     try {
         const response = await axios.get('/admin/rooms');
-        // If you need to refresh the entire page data, you can use Inertia's visit method
-        // For now, we'll just refresh the current modal if it's open
-        if (selectedCategory.value) {
+        // When modal is open, also update the selectedCategory stats from the latest payload
+        if (selectedCategory.value && Array.isArray(response.data)) {
+            const updated = response.data.find((c: any) => c.category === selectedCategory.value?.category);
+            if (updated) {
+                selectedCategory.value = updated;
+            }
             individualRooms.value = await fetchIndividualRooms(selectedCategory.value);
         }
     } catch (error) {
         console.error('Error refreshing room data:', error);
     }
 };
+
+// ----- Auto-refresh while the Individual Rooms modal is open -----
+let minuteAlignTimeout: number | null = null;
+let autoRefreshInterval: number | null = null;
+
+function clearAutoRefreshTimers() {
+    if (minuteAlignTimeout) { clearTimeout(minuteAlignTimeout); minuteAlignTimeout = null; }
+    if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+}
+
+async function doTimedRefresh() {
+    // Refresh category stats and individual rooms
+    await refreshRoomData();
+}
+
+function startAutoRefresh() {
+    clearAutoRefreshTimers();
+    // Immediate refresh to catch up
+    void doTimedRefresh();
+    // Align the next refresh to the top of the next minute for precise status flips (e.g., 9:30)
+    const now = new Date();
+    const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    minuteAlignTimeout = setTimeout(() => {
+        void doTimedRefresh();
+        autoRefreshInterval = setInterval(() => void doTimedRefresh(), 60_000);
+    }, Math.max(0, msToNextMinute));
+}
+
+// Start/stop auto-refresh with modal visibility
+watch(showIndividualRooms, (open) => {
+    if (open) startAutoRefresh();
+    else clearAutoRefreshTimers();
+});
+
+onUnmounted(() => clearAutoRefreshTimers());
 
 const getStatusColor = (status: string) => {
     switch (status) {
