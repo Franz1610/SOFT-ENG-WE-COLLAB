@@ -87,7 +87,7 @@
 
       <!-- Select a Room Section -->
       <div class="w-full max-w-6xl mt-16" id="room-selection">
-        <h2 class="text-xl font-semibold mb-6 text-neutral-900">SELECT A ROOM</h2>
+        <h2 class="text-xl font-semibold mb-6 text-neutral-900">SELECT A ROOM TYPE</h2>
         
         <!-- Room Selection Alert -->
         <div 
@@ -95,7 +95,7 @@
           class="flex items-center gap-2 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700"
         >
           <span class="text-orange-500 font-bold">!</span>
-          <span>Please select a room.</span>
+          <span>Please select a room type.</span>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -496,9 +496,9 @@ function paxDisallowText(room: any): string {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   z-index: 100;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.03);
+  box-shadow: none;
 }
 .header-inner {
   display: flex;
@@ -508,7 +508,7 @@ function paxDisallowText(room: any): string {
   margin: 0 auto;
   padding: 0.5rem 2rem;
   min-height: 54px;
-  width: 100vw;
+  width: 100%;
 }
 .logo {
   font-weight: bold;
@@ -552,7 +552,7 @@ function paxDisallowText(room: any): string {
   position: absolute;
   top: 54px;
   left: 0;
-  width: 100vw;
+  width: 100%;
   background: #495846;
   display: flex;
   flex-direction: column;

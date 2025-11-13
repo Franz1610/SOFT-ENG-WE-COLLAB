@@ -122,6 +122,7 @@ class BookingController extends Controller
     public function getUserBookings()
     {
         $bookings = Booking::where('user_id', auth()->id())
+            ->orderBy('created_at', 'desc')
             ->orderBy('booking_date', 'desc')
             ->orderBy('start_time', 'desc')
             ->get()
@@ -140,6 +141,7 @@ class BookingController extends Controller
                     'room' => $this->formatRoomLabel($booking->room_id),
                     'time' => $booking->formatted_time,
                     'status' => $paid ? 'Paid' : ($rejected ? 'Rejected' : ($pendingPayment ? 'Pending Payment' : $this->mapStatus($booking->status))),
+                    'created_at' => $booking->created_at ? $booking->created_at->toDateTimeString() : null,
                     'paid' => $paid,
                     'decline_reason' => $rejected ? $finance->decline_reason : null,
                     'can_cancel' => $booking->status === 'pending' && $booking->booking_date >= now()->toDateString(),

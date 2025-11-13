@@ -23,13 +23,18 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information (name and contact only).
+     * Update the user's profile information (first/last name and contact only).
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        $validated = $request->validated();
+        $first = trim($validated['first_name'] ?? '');
+        $last = trim($validated['last_name'] ?? '');
+
         $user = $request->user();
-        $user->name = $request->validated('name');
-        $user->contact = $request->validated('contact');
+        // Store combined full name in the existing `name` column
+        $user->name = trim($first . ' ' . $last);
+        $user->contact = $validated['contact'] ?? $user->contact;
         $user->save();
 
         return to_route('user.profile.edit');

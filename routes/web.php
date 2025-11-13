@@ -128,6 +128,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/admin/rooms/occupy', [\App\Http\Controllers\RoomManagementController::class, 'occupyRoom']);
         Route::post('/admin/rooms/extend', [\App\Http\Controllers\RoomManagementController::class, 'extendRoom']);
         Route::post('/admin/rooms/stop', [\App\Http\Controllers\RoomManagementController::class, 'stopRoom']);
+        // Admin utility to clear unintended reservations on specific rooms
+        Route::post('/admin/rooms/clear-reservations', [\App\Http\Controllers\RoomManagementController::class, 'clearRoomReservations']);
         // Note: availability endpoint is defined outside the admin group to allow normal users
         
     // Booking management - both admin and admin officer

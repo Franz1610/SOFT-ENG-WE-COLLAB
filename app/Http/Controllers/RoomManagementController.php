@@ -142,6 +142,7 @@ class RoomManagementController extends Controller
             ->where('status', 'confirmed')
             ->where('start_time', '<=', $currentTime)
             ->where('end_time', '>', $currentTime)
+            ->with('user')
             ->get();
 
         // Debug: Log what we found
@@ -155,6 +156,7 @@ class RoomManagementController extends Controller
             ->whereDate('booking_date', $today)
             ->where('status', 'confirmed')
             ->where('start_time', '>', $currentTime)
+            ->with('user')
             ->get();
 
         // If a date/time filter is provided, compute statuses for that window instead of live view
@@ -201,17 +203,20 @@ class RoomManagementController extends Controller
                                   ->where('end_time', '>', $start);
                         });
                     })
+                    ->with('user')
                     ->first();
 
                 if ($overlap) {
                     $isToday = $selectedDate === $today;
                     $nowTime = Carbon::now()->format('H:i:s');
                     $isActiveNow = $isToday && $overlap->start_time <= $nowTime && $overlap->end_time > $nowTime;
+                    // Prefer account name if linked; otherwise fall back to entered names
+                    $guestName = $overlap->user ? ($overlap->additional_info === 'Walk-in booking created by admin' ? 'Walk-in Guest' : $overlap->user->name) : trim(($overlap->first_name ?? '').' '.($overlap->last_name ?? ''));
                     $rooms[] = [
                         'number' => $roomNumber,
                         'status' => $isActiveNow ? 'Occupied' : 'Reserved',
                         'capacity' => $overlap->pax,
-                        'guest' => $overlap->first_name . ' ' . $overlap->last_name,
+                        'guest' => $guestName,
                         'timeRange' => $this->formatTimeRange($overlap->start_time, $overlap->end_time),
                         'booking_id' => $overlap->id
                     ];
@@ -267,12 +272,13 @@ class RoomManagementController extends Controller
                 $activeBooking = $confirmedBookings->firstWhere('room_id', $roomIdInt);
                 
                 if ($activeBooking) {
+                    $guestName = $activeBooking->user ? ($activeBooking->additional_info === 'Walk-in booking created by admin' ? 'Walk-in Guest' : $activeBooking->user->name) : trim(($activeBooking->first_name ?? '').' '.($activeBooking->last_name ?? ''));
                     \Log::info("Room {$i} (ID: {$roomIdInt}) is currently occupied by booking ID: {$activeBooking->id}");
                     $rooms[] = [
                         'number' => $roomNumber,
                         'status' => 'Occupied',
                         'capacity' => $activeBooking->pax,
-                        'guest' => $activeBooking->first_name . ' ' . $activeBooking->last_name,
+                        'guest' => $guestName,
                         'timeRange' => $this->formatTimeRange($activeBooking->start_time, $activeBooking->end_time),
                         'booking_id' => $activeBooking->id
                     ];
@@ -281,12 +287,13 @@ class RoomManagementController extends Controller
                     $upcomingBooking = $upcomingBookings->firstWhere('room_id', $roomIdInt);
                     
                     if ($upcomingBooking) {
+                        $guestName = $upcomingBooking->user ? ($upcomingBooking->additional_info === 'Walk-in booking created by admin' ? 'Walk-in Guest' : $upcomingBooking->user->name) : trim(($upcomingBooking->first_name ?? '').' '.($upcomingBooking->last_name ?? ''));
                         \Log::info("Room {$i} (ID: {$roomIdInt}) is reserved for upcoming booking ID: {$upcomingBooking->id}");
                         $rooms[] = [
                             'number' => $roomNumber,
                             'status' => 'Reserved',
                             'capacity' => $upcomingBooking->pax,
-                            'guest' => $upcomingBooking->first_name . ' ' . $upcomingBooking->last_name,
+                            'guest' => $guestName,
                             'timeRange' => $this->formatTimeRange($upcomingBooking->start_time, $upcomingBooking->end_time),
                             'booking_id' => $upcomingBooking->id
                         ];
@@ -629,21 +636,9 @@ class RoomManagementController extends Controller
 
         \Log::info("Room {$roomNumber} deleted successfully");
 
-        // Renumber all rooms in this category to fill gaps
-        try {
-            $this->renumberRooms($category);
-            \Log::info("Renumbering completed successfully");
-        } catch (\Exception $e) {
-            \Log::error("Error during renumbering: " . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => "Room deleted but renumbering failed: " . $e->getMessage()
-            ], 500);
-        }
-
         return response()->json([
             'success' => true,
-            'message' => "Room {$roomNumber} has been successfully deleted and rooms have been renumbered"
+            'message' => "Room {$roomNumber} has been successfully deleted"
         ]);
     }
 
@@ -1038,5 +1033,41 @@ class RoomManagementController extends Controller
                 'message' => 'Failed to stop booking. Please try again.'
             ], 500);
         }
+    }
+
+    /**
+     * Admin utility: clear upcoming/today confirmed bookings for specific rooms.
+     * This removes unintended "Reserved" state derived from such bookings.
+     */
+    public function clearRoomReservations(Request $request)
+    {
+        $validated = $request->validate([
+            'category' => 'required|string|in:individual,common,master',
+            'rooms' => 'required|array|min:1',
+            'rooms.*' => 'string'
+        ]);
+
+        $today = Carbon::today()->toDateString();
+        $updatedTotal = 0;
+
+        foreach ($validated['rooms'] as $roomRef) {
+            // Support both "Room X" and "PREFIX-XX" inputs
+            $actualRoomNumber = $this->mapFrontendToActualRoomNumber($validated['category'], $roomRef);
+            $roomIdInt = $this->mapRoomNumberToInteger($validated['category'], $actualRoomNumber);
+
+            // Cancel any confirmed bookings for today and future dates on this room
+            $updated = Booking::where('category', $validated['category'])
+                ->where('room_id', $roomIdInt)
+                ->whereDate('booking_date', '>=', $today)
+                ->where('status', 'confirmed')
+                ->update(['status' => 'cancelled']);
+
+            $updatedTotal += $updated;
+        }
+
+        return response()->json([
+            'success' => true,
+            'cancelled_count' => $updatedTotal
+        ]);
     }
 }

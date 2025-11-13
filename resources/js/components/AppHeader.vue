@@ -100,9 +100,10 @@ const menuOpen = ref(false)
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   z-index: 100;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.03);
+  box-shadow: none !important;
+  border-bottom: none !important;
 }
 .header-inner {
   display: flex;
@@ -112,7 +113,7 @@ const menuOpen = ref(false)
   margin: 0 auto;
   padding: 0.5rem 2rem;
   min-height: 54px;
-  width: 100vw;
+  width: 100%;
 }
 .logo {
   font-weight: bold;

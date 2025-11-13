@@ -46,12 +46,32 @@ const breadcrumbs: BreadcrumbItem[] = [
 const page = usePage();
 const bookings = computed(() => page.props.bookings as Booking[]);
 
+// Sort so latest appears first (by created_at desc, then by booking datetime, then by id)
+const sortedBookings = computed(() => {
+    const list = [...bookings.value];
+    return list.sort((a, b) => {
+        const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (aCreated !== bCreated) return bCreated - aCreated;
+
+        // Fallback: sort by booking date + start_time
+        const aDateTime = new Date(`${a.booking_date} ${a.start_time}`);
+        const bDateTime = new Date(`${b.booking_date} ${b.start_time}`);
+        const aTs = isNaN(aDateTime.getTime()) ? 0 : aDateTime.getTime();
+        const bTs = isNaN(bDateTime.getTime()) ? 0 : bDateTime.getTime();
+        if (aTs !== bTs) return bTs - aTs;
+
+        // Final tiebreaker
+        return (b.id ?? 0) - (a.id ?? 0);
+    });
+});
+
 // Pagination state
 const currentPage = ref(1);
 const pageSize = 10;
 const totalPages = computed(() => Math.ceil(bookings.value.length / pageSize));
 const paginatedBookings = computed(() =>
-    bookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
+    sortedBookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 );
 
 // Modal state

@@ -28,7 +28,8 @@ class FinanceController extends Controller
             ->orderBy('date', 'desc')
             ->get();
 
-        // Combine and transform all transactions
+        // Combine and transform all transactions. Include a sort key that uses precise creation time
+        // so entries on the same date are still ordered newest-first.
         $financeTransactions = $financeEntries->map(function ($entry) {
             return [
                 'id' => 'finance_' . $entry->id,
@@ -41,7 +42,8 @@ class FinanceController extends Controller
                 'payment_method' => $entry->payment_method,
                 'user' => $entry->creator,
                 'reference' => $entry->reference_notes,
-                'source' => 'finance_entry'
+                'source' => 'finance_entry',
+                'sort_key' => ($entry->transaction_date?->format('Y-m-d') ?? '0000-00-00') . ' ' . ($entry->created_at?->format('H:i:s') ?? '00:00:00'),
             ];
         });
 
@@ -56,13 +58,14 @@ class FinanceController extends Controller
                 'payment_method' => $transaction->payment_method,
                 'user' => $transaction->user,
                 'reference' => $transaction->reference,
-                'source' => 'general_transaction'
+                'source' => 'general_transaction',
+                'sort_key' => ($transaction->date?->format('Y-m-d') ?? '0000-00-00') . ' ' . ($transaction->created_at?->format('H:i:s') ?? '00:00:00'),
             ];
         });
 
-        // Merge all transactions and sort by date
+        // Merge all transactions and sort by the precise sort key (date + created time)
         $allTransactions = $financeTransactions->concat($generalTransactionsMapped)
-            ->sortByDesc('date')
+            ->sortByDesc('sort_key')
             ->values();
 
         // --- Apply filters ---

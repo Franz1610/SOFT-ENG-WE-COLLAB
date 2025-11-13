@@ -387,12 +387,36 @@ const filteredBookings = computed(() => {
   });
 });
 
+// Parse "F j, Y" date + leading start time from range like "2:00PM-3:00PM" → timestamp
+function parseStartTs(dateLabel: string, timeRange: string | undefined): number {
+  const d = Date.parse(dateLabel || '');
+  if (!timeRange) return isNaN(d) ? 0 : d;
+  const m = /([0-9]{1,2}:[0-9]{2}\s*[AP]M)/i.exec(timeRange);
+  if (!m) return isNaN(d) ? 0 : d;
+  const dt = Date.parse(`${dateLabel} ${m[1].toUpperCase().replace(/\s+/g,'')}`);
+  return isNaN(dt) ? (isNaN(d) ? 0 : d) : dt;
+}
+
+// Sort newest-first: by created_at when available, otherwise date+start; fallback to id desc
+const sortedFilteredBookings = computed(() => {
+  const list = [...filteredBookings.value];
+  return list.sort((a: any, b: any) => {
+    const aCreated = a.created_at ? Date.parse(a.created_at) : 0;
+    const bCreated = b.created_at ? Date.parse(b.created_at) : 0;
+    if (aCreated !== bCreated) return bCreated - aCreated;
+    const aTs = parseStartTs(a.date, a.time);
+    const bTs = parseStartTs(b.date, b.time);
+    if (aTs !== bTs) return bTs - aTs;
+    return (b.id ?? 0) - (a.id ?? 0);
+  });
+});
+
 // Pagination state
 const currentPage = ref(1);
 const pageSize = 5;
-const totalPages = computed(() => Math.ceil(filteredBookings.value.length / pageSize));
+const totalPages = computed(() => Math.ceil(sortedFilteredBookings.value.length / pageSize));
 const paginatedBookings = computed(() =>
-  filteredBookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
+  sortedFilteredBookings.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize)
 );
 
 watch(roomFilter, () => {
@@ -686,9 +710,9 @@ onMounted(() => {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   z-index: 100;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.03);
+  box-shadow: none;
 }
 
 .header-inner {
@@ -699,7 +723,7 @@ onMounted(() => {
   margin: 0 auto;
   padding: 0.5rem 2rem;
   min-height: 54px;
-  width: 100vw;
+  width: 100%;
 }
 
 .logo {
@@ -746,7 +770,7 @@ onMounted(() => {
   position: absolute;
   top: 54px;
   left: 0;
-  width: 100vw;
+  width: 100%;
   background: #495846;
   display: flex;
   flex-direction: column;

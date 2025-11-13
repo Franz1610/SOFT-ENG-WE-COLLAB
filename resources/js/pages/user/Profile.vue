@@ -22,6 +22,23 @@ const page = usePage();
 const user = page.props.auth.user as User;
 const isUnverified = computed(() => user && user.email_verified_at === null);
 
+// Derive default first/last name from stored full name
+const defaultFirstName = computed(() => {
+  const full = (user?.name || '').trim();
+  if (!full) return '';
+  const parts = full.split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  return parts.slice(0, parts.length - 1).join(' ');
+});
+
+const defaultLastName = computed(() => {
+  const full = (user?.name || '').trim();
+  if (!full) return '';
+  const parts = full.split(/\s+/);
+  if (parts.length === 1) return '';
+  return parts[parts.length - 1];
+});
+
 function onContactInput(event: Event) {
   const target = event.target as HTMLInputElement | null;
   if (!target) return;
@@ -47,17 +64,33 @@ function onContactInput(event: Event) {
           v-slot="{ errors, processing, recentlySuccessful }"
         >
           <div class="form-group">
-            <Label for="name" class="form-label">Name</Label>
-            <Input
-              id="name"
-              class="form-input"
-              name="name"
-              :default-value="user.name"
-              required
-              autocomplete="name"
-              placeholder="Full name"
-            />
-            <InputError class="form-error" :message="errors.name" />
+            <Label class="form-label">Name</Label>
+            <div style="display:flex; gap:0.75rem; width:100%;">
+              <div style="flex:1;">
+                <Input
+                  id="first_name"
+                  class="form-input"
+                  name="first_name"
+                  :default-value="defaultFirstName"
+                  required
+                  autocomplete="given-name"
+                  placeholder="First name"
+                />
+                <InputError class="form-error" :message="errors.first_name" />
+              </div>
+              <div style="flex:1;">
+                <Input
+                  id="last_name"
+                  class="form-input"
+                  name="last_name"
+                  :default-value="defaultLastName"
+                  required
+                  autocomplete="family-name"
+                  placeholder="Last name"
+                />
+                <InputError class="form-error" :message="errors.last_name" />
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
