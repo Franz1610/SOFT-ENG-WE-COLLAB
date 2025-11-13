@@ -72,9 +72,9 @@
                   id="pax" 
                   v-model="form.pax" 
                   type="number" 
-                  min="1" 
-                  max="10"
-                  placeholder="1-10"
+                  :min="paxBounds.min"
+                  :max="paxBounds.max"
+                  :placeholder="paxPlaceholder"
                   @input="validatePax"
                   required 
                 />
@@ -175,7 +175,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import AppHeader from '@/components/AppHeader.vue'
 
@@ -308,6 +308,20 @@ onMounted(() => {
 
 const selectedRoom = ref<number|null>(null);
 
+// Selected room/category helpers
+const selectedRoomData = computed(() => rooms.value.find(r => r.id === selectedRoom.value) || null);
+const selectedCategory = computed(() => selectedRoomData.value?.category || null);
+
+// Dynamic pax bounds based on selected category
+const paxBounds = computed(() => {
+  const cat = selectedCategory.value;
+  if (cat === 'individual') return { min: 1, max: 1 };
+  if (cat === 'common') return { min: 1, max: 4 };
+  if (cat === 'master') return { min: 1, max: 10 };
+  return { min: 1, max: 10 };
+});
+const paxPlaceholder = computed(() => `${paxBounds.value.min}-${paxBounds.value.max}`);
+
 function selectRoom(id: number) {
   // Find the room data
   const room = rooms.value.find(r => r.id === id);
@@ -359,11 +373,26 @@ function validatePax(event: Event) {
     form.value.pax = '';
     return;
   }
-  if (n < 1) n = 1;
-  if (n > 10) n = 10;
+  // Clamp to dynamic bounds
+  const { min, max } = paxBounds.value;
+  if (n < min) n = min;
+  if (n > max) n = max;
   target.value = n.toString();
   form.value.pax = target.value;
 }
+
+// When room selection (category) changes, auto-adjust pax to fit bounds
+watch(selectedCategory, () => {
+  const { min, max } = paxBounds.value;
+  const n = parseInt((form.value.pax || '').toString(), 10);
+  if (isNaN(n)) {
+    // If phone booth is selected, default to 1
+    if (min === 1 && max === 1) form.value.pax = '1';
+    return;
+  }
+  if (n < min) form.value.pax = String(min);
+  if (n > max) form.value.pax = String(max);
+});
 
 function submitBooking() {
   // Validate form data first
