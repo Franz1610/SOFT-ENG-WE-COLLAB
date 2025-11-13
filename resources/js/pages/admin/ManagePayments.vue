@@ -151,11 +151,13 @@ function closeProof() {
               <td class="table-td">
                 <div class="action-buttons">
                   <Button 
+                    variant="outline"
                     class="accept-btn"
                     @click="accept(p.id)" 
                     :disabled="p.status==='Verified'"
                   >Accept</Button>
                   <Button 
+                    variant="outline"
                     class="decline-btn"
                     @click="decline(p.id)"
                   >Decline</Button>
@@ -370,39 +372,39 @@ function closeProof() {
 }
 
 .accept-btn {
-  background: #4b824b;
-  color: #FFFAE9;
-  border: 2px solid #4b824b;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  background: #4b824b !important;
+  color: #FFFAE9 !important;
+  border: 2px solid #4b824b !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
 }
 
 .accept-btn:hover:not(:disabled) {
-  background: #3d6b3d;
-  border-color: #3d6b3d;
+  background: #3d6b3d !important;
+  border-color: #3d6b3d !important;
 }
 
 .accept-btn:disabled {
-  background: #9ca3af;
-  border-color: #9ca3af;
-  cursor: not-allowed;
+  background: #9ca3af !important;
+  border-color: #9ca3af !important;
+  cursor: not-allowed !important;
 }
 
 .decline-btn {
-  background: transparent;
-  color: #dc2626;
-  border: 2px solid #dc2626;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  background: transparent !important;
+  color: #dc2626 !important;
+  border: 2px solid #dc2626 !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
 }
 
 .decline-btn:hover {
-  background: #dc2626;
-  color: white;
+  background: #dc2626 !important;
+  color: white !important;
 }
 
 .no-data {
