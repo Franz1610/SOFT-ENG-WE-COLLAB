@@ -348,7 +348,7 @@ class RoomManagementController extends Controller
                 'id' => 2,
                 'name' => 'Regular Tables',
                 'category' => 'common',
-                'capacity' => '2-4 People',
+                'capacity' => '1-4 People',
                 'amenities' => ['Smart TV', 'WiFi', 'Video Conferencing', 'Whiteboard'],
                 'description' => 'Collaborative space ideal for small team meetings and discussions.'
             ],
@@ -356,7 +356,7 @@ class RoomManagementController extends Controller
                 'id' => 3,
                 'name' => 'Conference Rooms',
                 'category' => 'master',
-                'capacity' => '5-10 People',
+                'capacity' => '1-10 People',
                 'amenities' => ['4K Display', 'WiFi', 'Coffee Station', 'Video Conferencing', 'Whiteboard'],
                 'description' => 'Premium conference room for important meetings and presentations.'
             ]
