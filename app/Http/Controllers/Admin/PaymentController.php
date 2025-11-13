@@ -58,8 +58,12 @@ class PaymentController extends Controller
         $entry->reviewed_by = Auth::id();
         $entry->save();
 
-        // Optionally update booking status text for history page via updated_at; no schema change needed
-        // The history view maps payment state to "Paid"; see BookingController@getUserBookings
+        // Ensure the linked booking becomes actionable in Room Management.
+        // If the booking is still pending, mark it as confirmed so it appears
+        // as Reserved/Occupied according to its time window.
+        if ($entry->booking && $entry->booking->status === 'pending') {
+            $entry->booking->update(['status' => 'confirmed']);
+        }
 
         return redirect()->back()->with('success', 'Payment verified.');
     }

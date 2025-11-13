@@ -28,12 +28,13 @@ interface PaymentEntry {
 
 const props = defineProps<{ payments: PaymentEntry[] }>();
 const search = ref('');
-const filter = ref<'all'|'pending'|'verified'|'unprocessed'>('pending');
+const filter = ref<'all'|'pending'|'verified'|'declined'>('pending');
 
 const rows = computed(() => {
   let list = props.payments || [];
   if (filter.value !== 'all') {
-    const map: Record<string,string> = { pending: 'Pending Review', verified: 'Verified', unprocessed: 'Unprocessed' };
+    // Map UI filter values to backend status strings
+    const map: Record<string,string> = { pending: 'Pending Review', verified: 'Verified', declined: 'Unprocessed' };
     list = list.filter(p => p.status === map[filter.value]);
   }
   if (search.value.trim()) {
@@ -93,7 +94,7 @@ function closeProof() {
         >
           <option value="pending">Pending</option>
           <option value="verified">Verified</option>
-          <option value="unprocessed">Unprocessed</option>
+          <option value="declined">Declined</option>
           <option value="all">All</option>
         </select>
       </div>
@@ -132,8 +133,8 @@ function closeProof() {
                   <span :class="{
                     'status-badge status-pending': p.status==='Pending Review',
                     'status-badge status-verified': p.status==='Verified',
-                    'status-badge status-unprocessed': p.status==='Unprocessed'
-                  }">{{ p.status }}</span>
+                    'status-badge status-declined': p.status==='Unprocessed'
+                  }">{{ p.status==='Unprocessed' ? 'Declined' : p.status }}</span>
                   <span v-if="p.status==='Unprocessed' && (p as any).decline_reason" class="decline-reason">
                     Declined: {{ (p as any).decline_reason }}
                   </span>
@@ -336,10 +337,10 @@ function closeProof() {
   border: 1px solid #10b981;
 }
 
-.status-unprocessed {
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #6b7280;
+.status-declined {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #ef4444;
 }
 
 .decline-reason {

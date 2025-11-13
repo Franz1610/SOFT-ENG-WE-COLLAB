@@ -245,6 +245,11 @@ function getBookingTypeBadgeClass(booking: Booking) {
                                                 Cancel
                                             </Button>
                                         </template>
+                                        <template v-else-if="booking.status === 'cancelled'">
+                                            <span class="text-gray-400 text-xs">
+                                                No actions available
+                                            </span>
+                                        </template>
                                         <template v-else>
                                             <span class="text-gray-400 text-xs">
                                                 No actions available

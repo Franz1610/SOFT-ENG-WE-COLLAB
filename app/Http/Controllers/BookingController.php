@@ -244,6 +244,8 @@ class BookingController extends Controller
         return back()->with('success', 'Booking cancelled successfully');
     }
 
+    // Note: Intentionally no restore() endpoint to avoid conflict risks.
+
     /**
      * Show the payment page for a booking.
      * Lightweight placeholder: renders an Inertia page with booking details.
