@@ -40,9 +40,10 @@
         <component :is="active === 'booking' ? 'span' : Link" :href="active === 'booking' ? undefined : '/booking'" class="nav-link" :class="{ active: active === 'booking' }">
           Booking
         </component>
-        <component :is="active === 'home' ? 'span' : Link" :href="active === 'home' ? undefined : '/'" class="nav-link" :class="{ active: active === 'home' }">
+        <!-- Always render HOME as a clickable Link so users can navigate back to the homepage -->
+        <Link :href="'/'" class="nav-link" :class="{ active: active === 'home' }">
           HOME
-        </component>
+        </Link>
       </nav>
 
       <!-- Mobile menu -->
@@ -72,9 +73,10 @@
         <component :is="active === 'booking' ? 'span' : Link" :href="active === 'booking' ? undefined : '/booking'" class="nav-link" :class="{ active: active === 'booking' }" @click="menuOpen = false">
           Booking
         </component>
-        <component :is="active === 'home' ? 'span' : Link" :href="active === 'home' ? undefined : '/'" class="nav-link" :class="{ active: active === 'home' }" @click="menuOpen = false">
+        <!-- Mobile: always allow HOME to be clickable so users can return to the homepage -->
+        <Link :href="'/'" class="nav-link" :class="{ active: active === 'home' }" @click="menuOpen = false">
           HOME
-        </component>
+        </Link>
       </div>
     </div>
   </header>

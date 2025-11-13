@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 
 const props = defineProps<{
@@ -26,6 +26,39 @@ const form = ref({
   payment_method: 'Cash',
   reference: ''
 });
+
+// Separate display value for amount so we can show commas while typing
+const displayAmount = ref('');
+
+// Format a numeric string with commas (thousands separators)
+function formatNumber(value: string | number) {
+  if (value === null || value === undefined || value === '') return '';
+  const parts = String(value).toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+}
+
+// Input handler for the display amount input. Keeps displayAmount formatted
+// while storing a clean numeric string (without commas) in `form.amount`.
+function onDisplayAmountInput(e: Event) {
+  const input = e.target as HTMLInputElement;
+  // Remove any characters except digits and dot
+  let raw = input.value.replace(/[^0-9.]/g, '');
+  // If there are multiple dots, keep the first and remove the rest
+  const firstDotIndex = raw.indexOf('.');
+  if (firstDotIndex !== -1) {
+    const before = raw.slice(0, firstDotIndex + 1);
+    const after = raw.slice(firstDotIndex + 1).replace(/\./g, '');
+    raw = before + after;
+  }
+  // Format integer part with commas
+  const parts = raw.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const formatted = parts[1] ? `${parts[0]}.${parts[1]}` : parts[0];
+  displayAmount.value = formatted;
+  // Keep the raw numeric string (no commas) in form.amount for submissions
+  form.value.amount = raw.replace(/,/g, '');
+}
 
 // Define specific categories based on type
 const categoryOptions = computed(() => {
@@ -56,7 +89,8 @@ const filterCategoryOptions = computed(() => {
   }
 });
 
-const paymentMethods = ['Credit Card', 'Bank Transfer', 'Cash', 'Gift Card', 'Other'];
+// Restrict payment methods to only the supported options for manual transactions
+const paymentMethods = ['Cash', 'Gcash'];
 
 function openModal(transaction: any = null) {
   console.log('Opening modal, transaction:', transaction);
@@ -82,6 +116,8 @@ function openModal(transaction: any = null) {
       payment_method: transaction.payment_method || 'Cash',
       reference: transaction.reference || ''
     };
+    // Show formatted amount in the input
+    displayAmount.value = transaction.amount ? formatNumber(String(transaction.amount)) : '';
   } else {
     // Reset form for new transaction
     form.value = { 
@@ -93,6 +129,7 @@ function openModal(transaction: any = null) {
       payment_method: 'Cash',
       reference: '' 
     };
+    displayAmount.value = '';
   }
 }
 
@@ -124,6 +161,10 @@ function refreshData() {
 }
 
 function submit() {
+  // Ensure the amount sent to the server is a plain number (no commas)
+  const amountNumeric = displayAmount.value ? Number(String(displayAmount.value).replace(/,/g, '')) : 0;
+  form.value.amount = String(amountNumeric);
+
   if (editId.value) {
     router.put(`/admin/finance/transactions/${editId.value}`, form.value, { 
       onSuccess: () => { 
@@ -269,19 +310,19 @@ function capitalizeFirst(str: string) {
       <div class="grid auto-rows-min gap-4 md:grid-cols-4 mb-8">
         <div class="stats-card income">
           <div class="card-title">Total Income</div>
-          <div class="card-value">₱{{ filteredSummary.income }}</div>
+    <div class="card-value">₱{{ formatNumber(filteredSummary.income) }}</div>
         </div>
         <div class="stats-card expense">
           <div class="card-title">Total Expenses</div>
-          <div class="card-value">₱{{ filteredSummary.expense }}</div>
+    <div class="card-value">₱{{ formatNumber(filteredSummary.expense) }}</div>
         </div>
         <div class="stats-card net">
           <div class="card-title">Net Balance</div>
-          <div class="card-value">₱{{ filteredSummary.net }}</div>
+          <div class="card-value">₱{{ formatNumber(filteredSummary.net) }}</div>
         </div>
         <div class="stats-card revenue">
           <div class="card-title">Revenue</div>
-          <div class="card-value">₱{{ filteredSummary.revenue }}</div>
+          <div class="card-value">₱{{ formatNumber(filteredSummary.revenue) }}</div>
         </div>
       </div>
 
@@ -328,7 +369,7 @@ function capitalizeFirst(str: string) {
               <td>{{ formatDate(t.date) }}</td>
               <td>{{ t.description }}</td>
               <td>{{ capitalizeFirst(t.type) }}</td>
-              <td>₱{{ t.amount }}</td>
+              <td>₱{{ formatNumber(t.amount) }}</td>
               <td>{{ t.category }}</td>
               <td>{{ t.user?.name }}</td>
               <td>
@@ -396,7 +437,8 @@ function capitalizeFirst(str: string) {
             
             <div style="margin-bottom: 1rem;">
               <label style="display: block; margin-bottom: 0.3rem; color: #333; font-weight: 500;">Amount:</label>
-              <input v-model="form.amount" type="number" min="0" step="0.01" placeholder="0.00" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; color: #333;" />
+              <!-- Use a text input bound to displayAmount so we can show commas while typing -->
+              <input v-model="displayAmount" type="text" @input="onDisplayAmountInput" placeholder="0.00" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; color: #333;" />
             </div>
             
             <div style="margin-bottom: 1rem;">
