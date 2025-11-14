@@ -28,6 +28,6 @@ withDefaults(defineProps<Props>(), {
 .header {
     background-color: #4b824b !important;
     color: #FFFAE9 !important;
-    border-bottom: 2px solid #FFFAE9 !important;
+    border-bottom: none !important;
 }
 </style>

@@ -42,6 +42,7 @@ class FinanceController extends Controller
                 'payment_method' => $entry->payment_method,
                 'user' => $entry->creator,
                 'reference' => $entry->reference_notes,
+                'space_type' => optional($entry->booking)->room_name ?? 'Uncategorized',
                 'source' => 'finance_entry',
                 'sort_key' => ($entry->transaction_date?->format('Y-m-d') ?? '0000-00-00') . ' ' . ($entry->created_at?->format('H:i:s') ?? '00:00:00'),
             ];
@@ -58,6 +59,7 @@ class FinanceController extends Controller
                 'payment_method' => $transaction->payment_method,
                 'user' => $transaction->user,
                 'reference' => $transaction->reference,
+                'space_type' => null,
                 'source' => 'general_transaction',
                 'sort_key' => ($transaction->date?->format('Y-m-d') ?? '0000-00-00') . ' ' . ($transaction->created_at?->format('H:i:s') ?? '00:00:00'),
             ];
@@ -98,6 +100,19 @@ class FinanceController extends Controller
             'revenue' => $netRevenue,
         ];
 
+        $spaceSales = $filteredTransactions
+            ->filter(fn ($t) => $t['source'] === 'finance_entry')
+            ->groupBy(fn ($t) => $t['space_type'] ?? 'Uncategorized')
+            ->map(function ($group, $spaceType) {
+                return [
+                    'space_type' => $spaceType,
+                    'total' => $group->sum('amount'),
+                    'bookings' => $group->count(),
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
+
         // Define categories
         $incomeCategories = ['Booking Payment', 'Additional Service', 'Other Income'];
         $expenseCategories = ['Maintenance', 'Utilities', 'Supplies', 'Staff Salary'];
@@ -109,6 +124,7 @@ class FinanceController extends Controller
             'incomeCategories' => $incomeCategories,
             'expenseCategories' => $expenseCategories,
             'miscIncomeCategories' => $miscIncomeCategories,
+            'spaceSales' => $spaceSales,
         ]);
     }
 

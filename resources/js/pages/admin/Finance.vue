@@ -8,7 +8,8 @@ const props = defineProps<{
   summary: { income: number, expense: number, net: number, revenue: number },
   incomeCategories: string[],
   expenseCategories: string[],
-  miscIncomeCategories: string[]
+  miscIncomeCategories: string[],
+  spaceSales: { space_type: string; total: number; bookings: number }[],
 }>();
 
 // Get current user from shared props
@@ -91,6 +92,16 @@ const filterCategoryOptions = computed(() => {
 
 // Restrict payment methods to only the supported options for manual transactions
 const paymentMethods = ['Cash', 'Gcash'];
+
+const rawSpaceSales = computed(() => props.spaceSales || []);
+const totalBookingRevenue = computed(() => rawSpaceSales.value.reduce((sum, item) => sum + Number(item?.total ?? 0), 0));
+const spaceSalesReport = computed(() => {
+  const total = totalBookingRevenue.value || 0;
+  return rawSpaceSales.value.map(item => ({
+    ...item,
+    share: total ? (Number(item?.total ?? 0) / total) * 100 : 0,
+  }));
+});
 
 function openModal(transaction: any = null) {
   console.log('Opening modal, transaction:', transaction);
@@ -326,6 +337,34 @@ function capitalizeFirst(str: string) {
         </div>
       </div>
 
+      <!-- Sales by Space Type -->
+      <div class="sales-report mb-8">
+        <div class="sales-header">
+          <div>
+            <h2>Sales by Space Type</h2>
+            <p>Track which spaces generate the most booking revenue.</p>
+          </div>
+          <div class="sales-total" v-if="totalBookingRevenue">
+            <span>Total Booking Revenue</span>
+            <strong>₱{{ formatNumber(totalBookingRevenue) }}</strong>
+          </div>
+        </div>
+        <div v-if="spaceSalesReport.length" class="space-grid">
+          <div v-for="space in spaceSalesReport" :key="space.space_type" class="space-card">
+            <div class="space-card-header">
+              <h3>{{ space.space_type }}</h3>
+              <span>{{ space.share.toFixed(1) }}%</span>
+            </div>
+            <div class="space-amount">₱{{ formatNumber(space.total) }}</div>
+            <div class="space-meta">
+              <span>{{ space.bookings }} booking{{ space.bookings === 1 ? '' : 's' }}</span>
+              <span>of booking payments</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="space-empty">No booking payments in this range.</div>
+      </div>
+
       <!-- Filters -->
       <div class="filters mb-6">
         <select v-model="filterType">
@@ -535,4 +574,98 @@ function capitalizeFirst(str: string) {
 }
 .edit-btn { background: #1976d2; color: #fff; }
 .delete-btn { background: #c62828; color: #fff; }
+
+.sales-report {
+  background: #fff;
+  border: 2px solid #4b824b;
+  border-radius: 18px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 20px rgba(75, 130, 75, 0.1);
+}
+
+.sales-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.sales-header h2 {
+  font-size: 1.5rem;
+  color: #4b824b;
+  margin-bottom: 0.25rem;
+}
+
+.sales-header p {
+  color: #6b956b;
+}
+
+.sales-total {
+  text-align: right;
+  color: #344C34;
+}
+
+.sales-total span {
+  display: block;
+  font-size: 0.875rem;
+}
+
+.sales-total strong {
+  font-size: 1.75rem;
+  color: #4b824b;
+}
+
+.space-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.space-card {
+  background: #FFFAE9;
+  border: 1px solid rgba(75, 130, 75, 0.2);
+  border-radius: 14px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.space-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 20px rgba(75, 130, 75, 0.15);
+}
+
+.space-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: #4b824b;
+}
+
+.space-card-header span {
+  font-weight: 600;
+  color: #f97316;
+}
+
+.space-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #344C34;
+}
+
+.space-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #6b956b;
+}
+
+.space-empty {
+  text-align: center;
+  color: #6b956b;
+  font-style: italic;
+}
 </style>

@@ -187,7 +187,14 @@ function closeProof() {
         </a>
       </div>
       <DialogFooter class="modal-footer">
-        <Button class="close-btn" @click="closeProof">Close</Button>
+        <Button
+          variant="outline"
+          size="lg"
+          class="close-btn"
+          @click="closeProof"
+        >
+          Close
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -448,17 +455,24 @@ function closeProof() {
 }
 
 .close-btn {
-  background: transparent;
-  color: #4b824b;
-  border: 2px solid #4b824b;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  background: #4b824b !important;
+  color: #FFFAE9 !important;
+  border: 2px solid #3d6b3d !important;
+  padding: 0.65rem 2.5rem !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  box-shadow: 0 10px 18px rgba(75, 130, 75, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .close-btn:hover {
-  background: #4b824b;
-  color: #FFFAE9;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 26px rgba(61, 107, 61, 0.35);
+}
+
+.close-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 14px rgba(61, 107, 61, 0.3);
 }
 </style>

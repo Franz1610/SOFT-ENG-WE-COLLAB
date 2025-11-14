@@ -19,7 +19,7 @@ withDefaults(defineProps<Props>(), {
     <AppShell variant="sidebar">
         <AppSidebar />
         <AppContent variant="sidebar" class="overflow-x-hidden">
-            <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+                        <AppSidebarHeader :breadcrumbs="breadcrumbs" class="app-sidebar-header" />
             <slot />
         </AppContent>
     </AppShell>
@@ -38,8 +38,9 @@ withDefaults(defineProps<Props>(), {
 
 /* Optional: update header background if needed */
 :deep(.app-sidebar-header) {
-    background-color: #FFFAE9 !important;
-    color: #344C34 !important;
+    background-color: #4b824b !important;
+    color: #FFFAE9 !important;
+    border-bottom: none !important; /* remove white/tan line under header */
 }
 
 /* Navbar styles */
@@ -50,11 +51,10 @@ withDefaults(defineProps<Props>(), {
     border-bottom: 2px solid #4b824b !important;
 }
 
-/* Header styles */
-.app-sidebar-header,
+/* Header styles (keep consistent if other headers appear) */
 .header {
     background-color: #4b824b !important;
     color: #FFFAE9 !important;
-    border-bottom: 2px solid #FFFAE9 !important;
+    border-bottom: none !important;
 }
 </style>
