@@ -1,45 +1,6 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
-    <!-- Header -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo" @click="goHome">WECOLLAB</div>
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link">What's NEW?</a>
-          <span class="nav-link active">Booking</span>
-          <Link href="/" class="nav-link">HOME</Link>
-        </nav>
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
-          <span class="nav-link active" @click="menuOpen = false">Booking</span>
-          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="booking" @auth="handleAuthAction" />
 
     <!-- Main Content -->
     <main class="main-content flex-1 flex flex-col items-center justify-start px-6 py-16">
@@ -134,7 +95,20 @@
                       title="Make a new booking"
                     >Rebook</Button>
                   </template>
-                  <span v-else-if="booking.status && booking.status.toLowerCase() === 'paid'" class="status-badge bg-green-200 text-green-900">Paid</span>
+                  <div
+                    v-else-if="booking.status && booking.status.toLowerCase() === 'paid'"
+                    class="paid-status"
+                  >
+                    <span class="status-badge bg-green-200 text-green-900">Paid</span>
+                    <Button
+                      v-if="booking.receipt_available && booking.receipt"
+                      variant="outline"
+                      class="receipt-btn"
+                      @click="openReceiptModal(booking)"
+                    >
+                      View Receipt
+                    </Button>
+                  </div>
                   <span v-else class="cannot-cancel-text">
                     Cannot cancel
                   </span>
@@ -189,7 +163,7 @@
           </DialogDescription>
         </DialogHeader>
         
-        <DialogFooter class="flex gap-3 sm:justify-center">
+        <DialogFooter class="receipt-footer flex gap-3 sm:justify-center">
           <Button 
             variant="outline" 
             @click="closeLogoutModal"
@@ -290,6 +264,93 @@
       </DialogContent>
     </Dialog>
 
+    <!-- Receipt Modal -->
+    <Dialog :open="showReceiptModal" @update:open="closeReceiptModal">
+      <DialogContent class="sm:max-w-lg bg-white receipt-dialog">
+        <DialogHeader>
+          <DialogTitle class="text-center text-xl font-semibold" style="color: #495846;">
+            Invoice / Receipt
+          </DialogTitle>
+          <DialogDescription v-if="activeReceipt" class="text-center text-gray-600 mt-2">
+            {{ activeReceipt.invoice_number }} · Booking {{ activeReceipt.booking_reference }}
+          </DialogDescription>
+        </DialogHeader>
+        <div v-if="activeReceipt" class="receipt-body">
+          <div class="receipt-meta">
+            <div>
+              <p class="receipt-label">Customer</p>
+              <p class="receipt-value">{{ activeReceipt.customer_name }}</p>
+            </div>
+            <div>
+              <p class="receipt-label">Transaction Date</p>
+              <p class="receipt-value">{{ activeReceipt.transaction_date }}</p>
+            </div>
+            <div>
+              <p class="receipt-label">Payment Method</p>
+              <p class="receipt-value">{{ activeReceipt.payment_method }}</p>
+            </div>
+          </div>
+          <div class="receipt-split">
+            <div class="receipt-amounts">
+              <div class="amount-row">
+                <span>Amount Due</span>
+                <span>{{ formatCurrency(activeReceipt.gross_total || 0) }}</span>
+              </div>
+              <div class="amount-row">
+                <span>Amount Paid</span>
+                <span>{{ formatCurrency(activeReceipt.amount_received || 0) }}</span>
+              </div>
+              <div class="amount-row">
+                <span>Gateway Fee</span>
+                <span>{{ formatCurrency(activeReceipt.gateway_fee || 0) }}</span>
+              </div>
+              <div class="amount-row">
+                <span>Tax Collected</span>
+                <span>{{ formatCurrency(activeReceipt.tax_collected || 0) }}</span>
+              </div>
+              <div class="amount-row total">
+                <span>Net Revenue</span>
+                <span>{{ formatCurrency(activeReceipt.net_revenue || 0) }}</span>
+              </div>
+            </div>
+            <div class="receipt-notes" v-if="receiptNotes.length">
+              <p class="receipt-label mb-1">Reference Notes</p>
+              <ul>
+                <li v-for="note in receiptNotes" :key="note">{{ note }}</li>
+              </ul>
+            </div>
+          </div>
+          <div class="receipt-signatories">
+            <div>
+              <p class="receipt-label">Prepared By</p>
+              <p class="receipt-value">{{ activeReceipt.prepared_by ?? '—' }}</p>
+            </div>
+            <div>
+              <p class="receipt-label">Verified By</p>
+              <p class="receipt-value">{{ activeReceipt.approved_by ?? '—' }}</p>
+            </div>
+          </div>
+        </div>
+        <DialogFooter class="flex gap-3 sm:justify-center">
+          <Button
+            v-if="receiptBooking"
+            variant="outline"
+            class="border-[#495846] text-[#495846]"
+            @click="openReceiptPdf"
+          >
+            Download PDF
+          </Button>
+          <Button 
+            variant="outline" 
+            @click="closeReceiptModal"
+            class="border-[#495846] text-[#495846]"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <!-- Pay Modal (QR + payment form) -->
     <Dialog :open="showPayModal" @update:open="closePayModal">
       <DialogContent class="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-white pay-dialog">
@@ -343,8 +404,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { router, usePage, Link } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
+import AppHeader from '@/components/AppHeader.vue';
 import {
   Dialog,
   DialogContent,
@@ -439,13 +501,22 @@ const uniqueCategories = computed<string[]>(() => {
 
 // Modal state
 const showLogoutModal = ref(false);
-// Mobile menu state
-const menuOpen = ref(false);
 const showCancelModal = ref(false);
 const bookingToCancel = ref<number | null>(null);
 // Details modal state
 const showDetailsModal = ref(false);
 const selectedBooking = ref<any | null>(null);
+// Receipt modal state
+const showReceiptModal = ref(false);
+const receiptBooking = ref<any | null>(null);
+const activeReceipt = computed(() => receiptBooking.value?.receipt ?? null);
+const receiptNotes = computed<string[]>(() => {
+  if (!activeReceipt.value?.reference_notes) return [];
+  return activeReceipt.value.reference_notes
+    .split(/\r?\n/)
+    .map((note: string) => note.trim())
+    .filter(Boolean);
+});
 // Pay modal state
 const showPayModal = ref(false);
 const payBookingId = ref<number | null>(null);
@@ -590,6 +661,22 @@ function closeDetailsModal() {
   selectedBooking.value = null;
 }
 
+function openReceiptModal(booking: any) {
+  if (!booking?.receipt) return;
+  receiptBooking.value = booking;
+  showReceiptModal.value = true;
+}
+
+function closeReceiptModal() {
+  showReceiptModal.value = false;
+  receiptBooking.value = null;
+}
+
+function openReceiptPdf() {
+  if (!receiptBooking.value) return;
+  window.open(`/booking/${receiptBooking.value.id}/receipt`, '_blank');
+}
+
 // Redirect user to booking page to create a new booking after rejection
 function rebook() {
   router.visit('/booking');
@@ -668,10 +755,6 @@ const canSubmitPayment = computed(() => {
 });
 
 // Navigation functions
-function goHome() {
-  router.visit('/');
-}
-
 function goToBooking() {
   router.visit('/booking');
 }
@@ -841,6 +924,166 @@ main.main-content {
 .logout-btn {
   background-color: #dc2626 !important;
   border-color: #dc2626 !important;
+}
+
+.paid-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.receipt-btn {
+  border-color: #4b824b;
+  color: #4b824b;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.receipt-btn:hover {
+  background-color: #4b824b;
+  color: #fff;
+}
+
+.receipt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.receipt-body > * {
+  width: 100%;
+  max-width: 100%;
+}
+
+.receipt-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.receipt-label {
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.receipt-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.receipt-dialog {
+  border-radius: 16px;
+  border: none !important;
+  width: min(70vw, 390px);
+  max-width: 100%;
+  height: min(70vh, 520px);
+  max-height: min(70vh, 520px);
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column;
+  padding: 1rem !important;
+  overflow: hidden;
+  gap: 0 !important;
+}
+
+.receipt-dialog :deep([data-slot="dialog-header"]),
+.receipt-dialog :deep([data-slot="dialog-footer"]) {
+  flex-shrink: 0;
+}
+
+.receipt-dialog :deep([data-slot="dialog-header"]) {
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0.4rem;
+}
+
+.receipt-dialog :deep([data-slot="dialog-footer"]) {
+  padding-top: 0.4rem;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 0.4rem;
+}
+
+.receipt-amounts {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.receipt-split {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.receipt-split > * {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #1f2937;
+}
+
+.amount-row.total {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.receipt-notes {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  background: #fff;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.receipt-notes ul {
+  list-style: disc;
+  margin-left: 1.2rem;
+  color: #374151;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.receipt-signatories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.receipt-footer {
+  margin-top: 1.25rem;
+}
+
+.receipt-dialog :deep(.dialog-footer),
+.receipt-dialog > .dialog-footer {
+  margin-top: 1.25rem;
 }
 
 .logout-btn:hover {

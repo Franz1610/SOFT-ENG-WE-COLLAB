@@ -43,7 +43,7 @@ function confirmLogout() {
 </script>
 
 <template>
-  <div style="background: #232323; min-height: 100vh;">
+  <div style="background: #FFFAE9; min-height: 100vh;">
     <Head title="Dashboard" />
 
     <AppLayout>
@@ -149,10 +149,10 @@ function confirmLogout() {
 .stat-card {
   background-color: #4b824b; /* green */
   color: #FFFAE9; /* cream text */
-  border: 1px solid #4b824b;
+  border: 1px solid #3b6a3b;
   border-radius: 0.75rem; /* rounded-lg */
   padding: 1rem; /* p-4 */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12); /* soft shadow */
+  box-shadow: none; /* strip the dark edge */
 }
 
 .stat-inner {

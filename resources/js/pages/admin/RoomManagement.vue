@@ -632,7 +632,7 @@ const confirmStopRoom = async () => {
 </script>
 
 <template>
-    <div style="background: #232323; min-height: 100vh;">
+    <div style="background: #FFFAE9; min-height: 100vh;">
         <Head title="Room Management" />
 
         <AppLayout :breadcrumbs="[

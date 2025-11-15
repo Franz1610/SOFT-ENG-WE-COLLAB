@@ -45,6 +45,8 @@
                   inputmode="numeric"
                   maxlength="11"
                   @input="validateContactNumber"
+                  :readonly="isLoggedIn"
+                  :disabled="isLoggedIn"
                   required 
                 />
               </div>
@@ -300,11 +302,16 @@ const updateRoomAvailability = () => {
 // Update room availability on component mount
 onMounted(() => {
   updateRoomAvailability();
-  // Autofill email for logged-in users and prevent editing
-  if (user.value?.email) {
-    form.value.email = user.value.email as string;
-  }
 });
+
+watch(user, (current) => {
+  if (current?.email) {
+    form.value.email = current.email as string;
+  }
+  if (current?.contact) {
+    form.value.contact = current.contact as string;
+  }
+}, { immediate: true });
 
 const selectedRoom = ref<number|null>(null);
 

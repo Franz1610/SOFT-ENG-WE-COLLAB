@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\FinanceEntry;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -121,7 +122,8 @@ class BookingController extends Controller
 
     public function getUserBookings()
     {
-        $bookings = Booking::where('user_id', auth()->id())
+        $bookings = Booking::with(['financeEntry.creator', 'financeEntry.reviewer'])
+            ->where('user_id', auth()->id())
             ->orderBy('created_at', 'desc')
             ->orderBy('booking_date', 'desc')
             ->orderBy('start_time', 'desc')
@@ -133,6 +135,8 @@ class BookingController extends Controller
                 $rejected = $finance && $finance->status === 'Unprocessed' && $finance->decline_reason;
                 $pendingPayment = !$paid && !$rejected && $finance && $finance->status === 'Pending Review';
                 $amountPaid = $finance ? (float)($finance->amount_received ?? 0) : 0.0;
+                $receipt = $this->buildReceiptPayload($booking, $finance);
+
                 return [
                     'id' => $booking->id,
                     'date' => $booking->booking_date->format('F j, Y'),
@@ -150,10 +154,64 @@ class BookingController extends Controller
                     // Payment figures for the Pay modal
                     'amount_due' => $booking->estimated_price ?? null,
                     'amount_paid' => $amountPaid,
+                    'receipt_available' => (bool) $receipt,
+                    'receipt' => $receipt,
                 ];
             });
 
         return $bookings;
+    }
+
+    /** Build the receipt payload exposed to the Booking History UI for verified payments. */
+    private function buildReceiptPayload(Booking $booking, ?FinanceEntry $finance): ?array
+    {
+        if (!$finance || $finance->status !== 'Verified') {
+            return null;
+        }
+
+        $invoiceNumber = sprintf('INV-%05d', $finance->id);
+
+        return [
+            'invoice_number' => $invoiceNumber,
+            'booking_reference' => '#' . $booking->id,
+            'transaction_date' => optional($finance->transaction_date)->format('F j, Y'),
+            'customer_name' => $finance->customer_name,
+            'payment_method' => $finance->payment_method,
+            'gross_total' => (float) ($finance->gross_total ?? 0),
+            'amount_received' => (float) ($finance->amount_received ?? 0),
+            'gateway_fee' => (float) ($finance->gateway_fee ?? 0),
+            'tax_collected' => (float) ($finance->tax_collected ?? 0),
+            'net_revenue' => (float) ($finance->net_revenue ?? 0),
+            'reference_notes' => $finance->reference_notes,
+            'prepared_by' => optional($finance->creator)->name,
+            'approved_by' => optional($finance->reviewer)->name,
+            'status' => $finance->status,
+        ];
+    }
+
+    public function downloadReceipt($id)
+    {
+        $booking = Booking::with(['financeEntry.creator', 'financeEntry.reviewer'])
+            ->where('id', $id)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $finance = $booking->financeEntry;
+        if (!$finance || $finance->status !== 'Verified') {
+            abort(404);
+        }
+
+        $receipt = $this->buildReceiptPayload($booking, $finance);
+
+        $pdf = Pdf::loadView('pdf.receipt', [
+            'booking' => $booking,
+            'finance' => $finance,
+            'receipt' => $receipt,
+        ])->setPaper('a4');
+
+        $fileName = ($receipt['invoice_number'] ?? 'receipt') . '.pdf';
+
+        return $pdf->download($fileName);
     }
 
     /** Convert stored room_id (mapped int or legacy string) to a user-friendly "Room N" label. */

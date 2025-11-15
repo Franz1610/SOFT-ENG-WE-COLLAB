@@ -1,45 +1,6 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
-    <!-- Header -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo" @click="goHome">WECOLLAB</div>
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link">What's NEW?</a>
-          <span class="nav-link active">Booking</span>
-          <Link href="/" class="nav-link">HOME</Link>
-        </nav>
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
-          <span class="nav-link active" @click="menuOpen = false">Booking</span>
-          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="booking" @auth="handleAuthAction" />
 
     <!-- Main Content -->
     <main class="main-content flex-1 flex flex-col items-center justify-center px-6 py-16">
@@ -357,8 +318,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { router, usePage, Link } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
+import AppHeader from '@/components/AppHeader.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getDurationOptions, computePrice, formatPHP } from '@/utils/promo';
@@ -396,9 +358,6 @@ const showConfirmationModal = ref(false);
 const showLogoutModal = ref(false);
 const showOneHourWarningModal = ref(false);
 const showPastTimeWarningModal = ref(false);
-
-// Mobile menu state
-const menuOpen = ref(false);
 
 // Reactive time display properties that auto-update
 const currentTimeDisplay = ref('');
@@ -970,10 +929,6 @@ function confirmLogout() {
 
 function goBack() {
   router.visit('/booking');
-}
-
-function goHome() {
-  router.visit('/');
 }
 
 function handleLogout() {

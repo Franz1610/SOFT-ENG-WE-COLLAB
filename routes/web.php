@@ -1,15 +1,27 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Inertia\Inertia;
 use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\Admin\FeedbackController;
 use App\Http\Controllers\Admin\FinanceController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\FeedbackStreamController;
+use App\Http\Resources\PublicFeedbackResource;
+use App\Models\Feedback;
 
 Route::get('/', function () {
-    return Inertia::render('Home');
+    $liveFeedback = Feedback::with('user')
+        ->latest()
+        ->take(20)
+        ->get();
+
+    return Inertia::render('Home', [
+        'liveFeedback' => PublicFeedbackResource::collection($liveFeedback)->resolve(),
+        'liveFeedbackRefreshedAt' => now()->toIso8601String(),
+    ]);
 })->name('home');
 
 // What's NEW page (accessible to everyone - both logged in and guest users)
@@ -17,8 +29,16 @@ Route::get('/whats-new', function () {
     return Inertia::render('WhatsNew');
 })->name('whats-new');
 
+// Deals & Promo landing page
+Route::get('/deals', function () {
+    return Inertia::render('DealsPromo');
+})->name('deals');
+
 // Public API for room availability (accessible without auth)
 Route::get('/api/room-availability', [\App\Http\Controllers\RoomManagementController::class, 'getRoomCategories']);
+
+// Public feed for live reviews carousel
+Route::get('/api/feedback/live', [FeedbackStreamController::class, 'latest'])->name('feedback.live');
 
 Route::get('dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])->name('dashboard');
@@ -65,6 +85,9 @@ Route::get('/booking/{id}/pay', [\App\Http\Controllers\BookingController::class,
     ->middleware(['auth', 'verified']);
 // Submit payment proof (image) + details
 Route::post('/booking/{id}/pay', [\App\Http\Controllers\BookingController::class, 'submitPayment'])
+    ->middleware(['auth', 'verified']);
+
+Route::get('/booking/{id}/receipt', [\App\Http\Controllers\BookingController::class, 'downloadReceipt'])
     ->middleware(['auth', 'verified']);
 
 
@@ -223,4 +246,33 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile', [\App\Http\Controllers\User\ProfileController::class, 'edit'])->name('user.profile.edit');
     Route::patch('/profile', [\App\Http\Controllers\User\ProfileController::class, 'update'])->name('user.profile.update');
 });
+
+if (app()->environment('local')) {
+    Route::get('/dev/mail-preview/verify', function () {
+        $user = \App\Models\User::select('id', 'email')->first();
+        $email = $user?->email ?? 'preview@example.com';
+        $userId = $user?->getKey() ?? 1;
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            ['id' => $userId, 'hash' => sha1($email)]
+        );
+
+        return view('vendor.notifications.email', [
+            'greeting' => __('Hello!'),
+            'level' => 'primary',
+            'introLines' => [
+                __('Please click the button below to verify your email address.'),
+            ],
+            'actionText' => __('Verify Email Address'),
+            'actionUrl' => $verificationUrl,
+            'displayableActionUrl' => $verificationUrl,
+            'outroLines' => [
+                __('If you did not create an account, no further action is required.'),
+            ],
+            'salutation' => null,
+        ]);
+    })->name('dev.mail-preview.verify');
+}
 
