@@ -110,13 +110,7 @@ function closeCommentModal() {
 <template>
   <AppLayout>
     <div class="feedback-bg min-h-screen">
-      <!-- Header Section -->
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h1 class="text-3xl font-bold text-[#4b824b] mb-2">Feedback Management</h1>
-          <p class="text-[#344C34]">View and manage all user-submitted feedback</p>
-        </div>
-      </div>
+      <!-- Using global AppSidebarHeader from AppLayout; removed local header -->
 
       <!-- Statistics Cards -->
       <div class="grid auto-rows-min gap-4 md:grid-cols-3 mb-8">
@@ -245,7 +239,7 @@ function closeCommentModal() {
 .feedback-bg {
   background: #FFFAE9;
   min-height: 100vh;
-  padding: 2rem 1rem;
+  padding: 1.25rem 1rem; /* slightly tighter to align under app header */
 }
 .stats-card {
   background: #4b824b;

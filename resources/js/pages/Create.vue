@@ -1,45 +1,6 @@
 <template>
   <div style="background: #ffffff; min-height: 100vh;">
-    <!-- Header (kept consistent with Home.vue) -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo" @click="goHome" role="button" tabindex="0">WECOLLAB</div>
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link">What's NEW?</a>
-          <Link href="/booking" class="nav-link">Booking</Link>
-          <button class="home-btn" @click="goHome">HOME</button>
-        </nav>
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
-          <Link href="/booking" class="nav-link" @click="menuOpen = false">Booking</Link>
-          <button class="home-btn" @click="goHome">HOME</button>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="create" @auth="handleAuthAction" />
 
     <main class="main-content" style="padding: 80px 20px 120px;">
       <div style="max-width: 1100px; margin: 0 auto; color: #232323;">
@@ -134,14 +95,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
+import AppHeader from '@/components/AppHeader.vue';
 
 // Basic auth/header helpers (keeps header consistent with Home.vue)
 const page = usePage();
 const user = computed(() => page.props.auth?.user ?? null);
-
-// Mobile menu state
-const menuOpen = ref(false);
 
 function handleAuthAction() {
   if (user.value) {
@@ -150,9 +109,6 @@ function handleAuthAction() {
   } else {
     router.visit('/login');
   }
-}
-function goHome() {
-  router.visit('/');
 }
 
 // Survey cards data (replicates the design blocks from your screenshot)

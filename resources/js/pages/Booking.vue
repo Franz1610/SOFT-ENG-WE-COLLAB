@@ -1,45 +1,7 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
     <!-- Header -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo">WECOLLAB</div>
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link">What's NEW?</a>
-          <span class="nav-link active">Booking</span>
-          <Link href="/" class="nav-link">HOME</Link>
-        </nav>
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
-          <span class="nav-link active" @click="menuOpen = false">Booking</span>
-          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="booking" @auth="handleAuthAction" />
 
     <!-- Main Content -->
     <main class="main-content flex-1 flex flex-col items-center justify-start px-2 py-8 md:py-12">
@@ -79,14 +41,26 @@
                   v-model="form.contact" 
                   type="tel" 
                   autocomplete="tel" 
-                  pattern="[0-9]*"
+                  pattern="[0-9]{11}"
+                  inputmode="numeric"
+                  maxlength="11"
                   @input="validateContactNumber"
+                  :readonly="isLoggedIn"
+                  :disabled="isLoggedIn"
                   required 
                 />
               </div>
               <div class="flex-1">
                 <Label for="email">Email</Label>
-                <Input id="email" v-model="form.email" type="email" autocomplete="email" required />
+                <Input 
+                  id="email" 
+                  v-model="form.email" 
+                  type="email" 
+                  autocomplete="email" 
+                  :readonly="isLoggedIn" 
+                  :disabled="isLoggedIn" 
+                  required 
+                />
               </div>
             </div>
             <div class="flex gap-3">
@@ -95,14 +69,14 @@
                 <Input id="additional" v-model="form.additional" />
               </div>
               <div class="flex-1">
-                <Label for="pax">No. of Pax</Label>
+                <Label for="pax">No. of People</Label>
                 <Input 
                   id="pax" 
                   v-model="form.pax" 
                   type="number" 
-                  min="1" 
-                  max="10"
-                  placeholder="1-10"
+                  :min="paxBounds.min"
+                  :max="paxBounds.max"
+                  :placeholder="paxPlaceholder"
                   @input="validatePax"
                   required 
                 />
@@ -115,7 +89,7 @@
 
       <!-- Select a Room Section -->
       <div class="w-full max-w-6xl mt-16" id="room-selection">
-        <h2 class="text-xl font-semibold mb-6 text-neutral-900">SELECT A ROOM</h2>
+        <h2 class="text-xl font-semibold mb-6 text-neutral-900">SELECT A ROOM TYPE</h2>
         
         <!-- Room Selection Alert -->
         <div 
@@ -123,14 +97,16 @@
           class="flex items-center gap-2 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-orange-700"
         >
           <span class="text-orange-500 font-bold">!</span>
-          <span>Please select a room.</span>
+          <span>Please select a room type.</span>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div v-for="room in rooms" :key="room.id" @click="canSelectRoom(room) && selectRoom(room.id)"
             :class="[
               'relative transition-all border-2 rounded-xl p-4 flex flex-col items-center',
-              selectedRoom === room.id ? 'border-green-700 bg-green-50' : 'border-neutral-200 bg-white',
+              selectedRoom === room.id 
+                ? 'border-green-700 bg-green-100 ring-2 ring-green-600 ring-offset-2 shadow-md scale-[1.01]'
+                : 'border-neutral-200 bg-white',
               canSelectRoom(room) ? 'cursor-pointer hover:border-green-600' : 'cursor-not-allowed opacity-60',
               roomsBlinking ? 'animate-pulse' : ''
             ]"
@@ -201,8 +177,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ref, computed, onMounted } from 'vue';
-import { router, Link, usePage } from '@inertiajs/vue3';
+import { ref, computed, onMounted, watch } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import AppHeader from '@/components/AppHeader.vue'
 
 // Get props from backend
 interface RoomCategory {
@@ -227,11 +204,11 @@ const props = defineProps<Props>();
 // Get authentication data from Inertia
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const isLoggedIn = computed(() => !!user.value);
 
 // Modal state
 const showLogoutModal = ref(false);
-// Mobile menu state
-const menuOpen = ref(false);
+// Mobile menu handled by AppHeader
 const showRoomAlert = ref(false);
 const roomsBlinking = ref(false);
 
@@ -247,10 +224,10 @@ const form = ref({
 const rooms = ref([
   {
     id: 1,
-    name: 'INDIV ROOM',
+    name: 'PHONE BOOTH ROOMS',
     image: '/images/booking/indiv_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '1-2 PAX ONLY',
+    capacity: '1 PAX ONLY',
     category: 'individual',
     totalRooms: 12,
     availableRooms: 0,
@@ -259,10 +236,10 @@ const rooms = ref([
   },
   {
     id: 3,
-    name: 'COMMON ROOM',
+    name: 'REGULAR TABLES',
     image: '/images/booking/common_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '3-4 PAX ONLY',
+    capacity: '1-4 PAX ONLY',
     category: 'common',
     totalRooms: 5,
     availableRooms: 0,
@@ -271,10 +248,10 @@ const rooms = ref([
   },
   {
     id: 2,
-    name: 'MASTER ROOM',
+    name: 'CONFERENCE ROOMS',
     image: '/images/booking/master_room.png',
     availability: 'Loading...', // Will be updated from props
-    capacity: '5-10 PAX ONLY',
+    capacity: '1-10 PAX ONLY',
     category: 'master',
     totalRooms: 3,
     availableRooms: 0,
@@ -327,7 +304,30 @@ onMounted(() => {
   updateRoomAvailability();
 });
 
+watch(user, (current) => {
+  if (current?.email) {
+    form.value.email = current.email as string;
+  }
+  if (current?.contact) {
+    form.value.contact = current.contact as string;
+  }
+}, { immediate: true });
+
 const selectedRoom = ref<number|null>(null);
+
+// Selected room/category helpers
+const selectedRoomData = computed(() => rooms.value.find(r => r.id === selectedRoom.value) || null);
+const selectedCategory = computed(() => selectedRoomData.value?.category || null);
+
+// Dynamic pax bounds based on selected category
+const paxBounds = computed(() => {
+  const cat = selectedCategory.value;
+  if (cat === 'individual') return { min: 1, max: 1 };
+  if (cat === 'common') return { min: 1, max: 4 };
+  if (cat === 'master') return { min: 1, max: 10 };
+  return { min: 1, max: 10 };
+});
+const paxPlaceholder = computed(() => `${paxBounds.value.min}-${paxBounds.value.max}`);
 
 function selectRoom(id: number) {
   // Find the room data
@@ -360,7 +360,7 @@ function selectRoom(id: number) {
 function validateContactNumber(event: Event) {
   const target = event.target as HTMLInputElement;
   // Remove any non-numeric characters
-  target.value = target.value.replace(/[^0-9]/g, '');
+  target.value = target.value.replace(/[^0-9]/g, '').slice(0, 11);
   // Update the form value
   form.value.contact = target.value;
 }
@@ -380,11 +380,26 @@ function validatePax(event: Event) {
     form.value.pax = '';
     return;
   }
-  if (n < 1) n = 1;
-  if (n > 10) n = 10;
+  // Clamp to dynamic bounds
+  const { min, max } = paxBounds.value;
+  if (n < min) n = min;
+  if (n > max) n = max;
   target.value = n.toString();
   form.value.pax = target.value;
 }
+
+// When room selection (category) changes, auto-adjust pax to fit bounds
+watch(selectedCategory, () => {
+  const { min, max } = paxBounds.value;
+  const n = parseInt((form.value.pax || '').toString(), 10);
+  if (isNaN(n)) {
+    // If phone booth is selected, default to 1
+    if (min === 1 && max === 1) form.value.pax = '1';
+    return;
+  }
+  if (n < min) form.value.pax = String(min);
+  if (n > max) form.value.pax = String(max);
+});
 
 function submitBooking() {
   // Validate form data first
@@ -425,6 +440,12 @@ function submitBooking() {
   // Get the category from the selected room
   const selectedRoomData = rooms.value.find(room => room.id === selectedRoom.value);
   const category = selectedRoomData?.category || 'individual';
+
+  // Enforce contact to be exactly 11 digits
+  if (!/^\d{11}$/.test(form.value.contact)) {
+    alert('Please enter a valid 11-digit contact number.');
+    return;
+  }
 
   // Store booking data in session storage for the next page
   const bookingData = {
@@ -476,9 +497,12 @@ const numericPax = computed(() => {
 // Determines if a room category is allowed by pax rules
 function isRoomAllowedByPax(category: string, pax: number): boolean {
   if (isNaN(pax)) return true;
-  if (pax >= 1 && pax <= 2) return category === 'individual';
-  if (pax >= 5 && pax <= 10) return category === 'master';
-  if (pax >= 3 && pax <= 4) return category === 'common';
+  // Phone booth rooms: exactly 1 pax
+  if (category === 'individual') return pax === 1;
+  // Regular tables: 1-4 pax
+  if (category === 'common') return pax >= 1 && pax <= 4;
+  // Conference rooms: 1-10 pax
+  if (category === 'master') return pax >= 1 && pax <= 10;
   return false;
 }
 
@@ -491,10 +515,12 @@ function canSelectRoom(room: any): boolean {
 function paxDisallowText(room: any): string {
   const p = numericPax.value;
   if (isNaN(p)) return '';
-  if (p >= 1 && p <= 2 && room.category !== 'individual') return `Not allowed for ${p} pax`;
-  if (p >= 3 && p <= 4 && room.category !== 'common') return `Not allowed for ${p} pax`;
-  if (p >= 5 && p <= 10 && room.category !== 'master') return `Not allowed for ${p} pax`;
-  if (!(p === 1 || (p >= 3 && p <= 4) || (p >= 5 && p <= 10))) return `Not allowed for ${p} pax`;
+  // Only 1 pax allowed for phone booths
+  if (room.category === 'individual' && p !== 1) return `Not allowed for ${p} pax`;
+  // 1-4 pax for regular tables
+  if (room.category === 'common' && !(p >= 1 && p <= 4)) return `Not allowed for ${p} pax`;
+  // 1-10 pax allowed for conference rooms; show note only if outside 1-10
+  if (room.category === 'master' && !(p >= 1 && p <= 10)) return `Not allowed for ${p} pax`;
   return '';
 }
 </script>
@@ -506,9 +532,9 @@ function paxDisallowText(room: any): string {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   z-index: 100;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.03);
+  box-shadow: none;
 }
 .header-inner {
   display: flex;
@@ -518,7 +544,7 @@ function paxDisallowText(room: any): string {
   margin: 0 auto;
   padding: 0.5rem 2rem;
   min-height: 54px;
-  width: 100vw;
+  width: 100%;
 }
 .logo {
   font-weight: bold;
@@ -562,7 +588,7 @@ function paxDisallowText(room: any): string {
   position: absolute;
   top: 54px;
   left: 0;
-  width: 100vw;
+  width: 100%;
   background: #495846;
   display: flex;
   flex-direction: column;
@@ -657,7 +683,27 @@ main.main-content {
   .grid-cols-3 {
     grid-template-columns: 1fr !important;
   }
+  /* Match Home page header behavior on small screens */
+  .header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
   .nav { display: none; }
   .hamburger-btn { display: inline-flex; align-items: center; justify-content: center; }
+  .main-content { padding: 0; }
+}
+
+/* Match Home page responsive paddings for consistent spacing */
+@media (max-width: 1200px) {
+  .header-inner {
+    padding: 0.5rem 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-inner {
+    padding: 0.5rem 0.5rem;
+  }
 }
 </style>

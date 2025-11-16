@@ -28,12 +28,13 @@ interface PaymentEntry {
 
 const props = defineProps<{ payments: PaymentEntry[] }>();
 const search = ref('');
-const filter = ref<'all'|'pending'|'verified'|'unprocessed'>('pending');
+const filter = ref<'all'|'pending'|'verified'|'declined'>('pending');
 
 const rows = computed(() => {
   let list = props.payments || [];
   if (filter.value !== 'all') {
-    const map: Record<string,string> = { pending: 'Pending Review', verified: 'Verified', unprocessed: 'Unprocessed' };
+    // Map UI filter values to backend status strings
+    const map: Record<string,string> = { pending: 'Pending Review', verified: 'Verified', declined: 'Unprocessed' };
     list = list.filter(p => p.status === map[filter.value]);
   }
   if (search.value.trim()) {
@@ -93,7 +94,7 @@ function closeProof() {
         >
           <option value="pending">Pending</option>
           <option value="verified">Verified</option>
-          <option value="unprocessed">Unprocessed</option>
+          <option value="declined">Declined</option>
           <option value="all">All</option>
         </select>
       </div>
@@ -132,8 +133,8 @@ function closeProof() {
                   <span :class="{
                     'status-badge status-pending': p.status==='Pending Review',
                     'status-badge status-verified': p.status==='Verified',
-                    'status-badge status-unprocessed': p.status==='Unprocessed'
-                  }">{{ p.status }}</span>
+                    'status-badge status-declined': p.status==='Unprocessed'
+                  }">{{ p.status==='Unprocessed' ? 'Declined' : p.status }}</span>
                   <span v-if="p.status==='Unprocessed' && (p as any).decline_reason" class="decline-reason">
                     Declined: {{ (p as any).decline_reason }}
                   </span>
@@ -151,11 +152,13 @@ function closeProof() {
               <td class="table-td">
                 <div class="action-buttons">
                   <Button 
+                    variant="outline"
                     class="accept-btn"
                     @click="accept(p.id)" 
                     :disabled="p.status==='Verified'"
                   >Accept</Button>
                   <Button 
+                    variant="outline"
                     class="decline-btn"
                     @click="decline(p.id)"
                   >Decline</Button>
@@ -184,7 +187,14 @@ function closeProof() {
         </a>
       </div>
       <DialogFooter class="modal-footer">
-        <Button class="close-btn" @click="closeProof">Close</Button>
+        <Button
+          variant="outline"
+          size="lg"
+          class="close-btn"
+          @click="closeProof"
+        >
+          Close
+        </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -334,10 +344,10 @@ function closeProof() {
   border: 1px solid #10b981;
 }
 
-.status-unprocessed {
-  background: #f3f4f6;
-  color: #374151;
-  border: 1px solid #6b7280;
+.status-declined {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #ef4444;
 }
 
 .decline-reason {
@@ -370,39 +380,39 @@ function closeProof() {
 }
 
 .accept-btn {
-  background: #4b824b;
-  color: #FFFAE9;
-  border: 2px solid #4b824b;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  background: #4b824b !important;
+  color: #FFFAE9 !important;
+  border: 2px solid #4b824b !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
 }
 
 .accept-btn:hover:not(:disabled) {
-  background: #3d6b3d;
-  border-color: #3d6b3d;
+  background: #3d6b3d !important;
+  border-color: #3d6b3d !important;
 }
 
 .accept-btn:disabled {
-  background: #9ca3af;
-  border-color: #9ca3af;
-  cursor: not-allowed;
+  background: #9ca3af !important;
+  border-color: #9ca3af !important;
+  cursor: not-allowed !important;
 }
 
 .decline-btn {
-  background: transparent;
-  color: #dc2626;
-  border: 2px solid #dc2626;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  background: transparent !important;
+  color: #dc2626 !important;
+  border: 2px solid #dc2626 !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
 }
 
 .decline-btn:hover {
-  background: #dc2626;
-  color: white;
+  background: #dc2626 !important;
+  color: white !important;
 }
 
 .no-data {
@@ -445,17 +455,24 @@ function closeProof() {
 }
 
 .close-btn {
-  background: transparent;
-  color: #4b824b;
-  border: 2px solid #4b824b;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  background: #4b824b !important;
+  color: #FFFAE9 !important;
+  border: 2px solid #3d6b3d !important;
+  padding: 0.65rem 2.5rem !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+  box-shadow: 0 10px 18px rgba(75, 130, 75, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .close-btn:hover {
-  background: #4b824b;
-  color: #FFFAE9;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 26px rgba(61, 107, 61, 0.35);
+}
+
+.close-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 14px rgba(61, 107, 61, 0.3);
 }
 </style>

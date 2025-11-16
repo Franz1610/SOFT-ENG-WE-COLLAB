@@ -1,45 +1,6 @@
 <template>
   <div style="background: #232323; min-height: 100vh;">
-    <!-- Header -->
-    <header class="header sticky-header">
-      <div class="header-inner">
-        <div class="logo" @click="goHome">WECOLLAB</div>
-        <button
-          class="hamburger-btn"
-          @click="menuOpen = !menuOpen"
-          :aria-expanded="menuOpen"
-          aria-label="Toggle navigation menu"
-        >
-          <span class="hamburger-icon" aria-hidden="true"></span>
-        </button>
-        <nav class="nav">
-          <a 
-            href="#" 
-            @click.prevent="handleAuthAction"
-            :class="['nav-link', { 'logout-link': user }]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link">What's NEW?</a>
-          <span class="nav-link active">Booking</span>
-          <Link href="/" class="nav-link">HOME</Link>
-        </nav>
-        <div v-if="menuOpen" class="mobile-menu">
-          <a
-            href="#"
-            @click.prevent="handleAuthAction(); menuOpen = false"
-            :class="['nav-link', { 'logout-link': user } ]"
-          >
-            {{ user ? 'Log out' : 'Log in' }}
-          </a>
-          <a href="#" class="nav-link" @click="menuOpen = false">Deals & Promo</a>
-          <a href="/whats-new" class="nav-link" @click="menuOpen = false">What's NEW?</a>
-          <span class="nav-link active" @click="menuOpen = false">Booking</span>
-          <Link href="/" class="nav-link" @click="menuOpen = false">HOME</Link>
-        </div>
-      </div>
-    </header>
+    <AppHeader :user="user" active="booking" @auth="handleAuthAction" />
 
     <!-- Main Content -->
     <main class="main-content flex-1 flex flex-col items-center justify-center px-6 py-16">
@@ -47,7 +8,7 @@
         <h1 class="text-3xl font-bold mb-2 text-center text-neutral-900">SELECT DATE & TIME</h1>
         <p class="text-center text-neutral-600 mb-8">Choose your preferred date and time for your booking</p>
         
-        <form @submit.prevent="submitSchedule" class="space-y-6">
+  <form @submit.prevent="submitSchedule" class="space-y-6">
           <div>
             <Label for="date">Date</Label>
             <Input 
@@ -75,15 +36,13 @@
                   @input="formatTimeInput($event, 'startTime', 'hour')"
                 />
                 <span class="mx-1 text-lg">:</span>
-                <input 
+                <select 
                   v-model="form.startTime.minute"
-                  type="number" 
-                  min="00" 
-                  max="59" 
-                  placeholder="00"
-                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
-                  @input="formatTimeInput($event, 'startTime', 'minute')"
-                />
+                  class="w-16 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                >
+                  <option value="00">00</option>
+                  <option value="30">30</option>
+                </select>
               </div>
               <select 
                 v-model="form.startTime.period"
@@ -93,6 +52,25 @@
                 <option value="PM">PM</option>
               </select>
             </div>
+          </div>
+
+          <!-- Duration -->
+          <div>
+            <Label>Duration</Label>
+            <select 
+              v-model="form.durationHours"
+              class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              :disabled="isConferenceCategory"
+            >
+              <option v-for="h in allowedDurations" :key="h" :value="String(h)">{{ h }} hour{{ h > 1 ? 's' : '' }}</option>
+            </select>
+            <p class="text-xs text-neutral-500 mt-1" v-if="!isConferenceCategory">End time is computed from start time and duration.</p>
+            <p class="text-xs text-green-700 mt-1" v-else>
+              Conference rooms are per-hour ({{ conferencePromoTier }} pax bracket).
+            </p>
+            <p class="text-sm mt-2" style="color:#495846" v-if="priceBlurb">
+              {{ priceBlurb }}
+            </p>
           </div>
 
           <!-- End Time -->
@@ -106,8 +84,10 @@
                   min="01" 
                   max="12" 
                   placeholder="00"
-                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold opacity-70"
                   @input="formatTimeInput($event, 'endTime', 'hour')"
+                  :readonly="true"
+                  :disabled="true"
                 />
                 <span class="mx-1 text-lg">:</span>
                 <input 
@@ -116,17 +96,40 @@
                   min="00" 
                   max="59" 
                   placeholder="00"
-                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold"
+                  class="w-12 text-center border-0 bg-transparent focus:ring-0 text-lg font-semibold opacity-70"
                   @input="formatTimeInput($event, 'endTime', 'minute')"
+                  :readonly="true"
+                  :disabled="true"
                 />
               </div>
               <select 
                 v-model="form.endTime.period"
-                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 opacity-70"
+                :disabled="true"
               >
                 <option value="AM">AM</option>
                 <option value="PM">PM</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Room selection -->
+          <div>
+            <Label>Room</Label>
+            <div class="mt-1">
+              <select 
+                v-model="selectedRoomId"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                :disabled="roomLoading || availableRooms.length === 0"
+              >
+                <option value="" disabled>Select a room</option>
+                <option v-for="r in availableRooms" :key="r.id" :value="r.id">
+                  {{ r.number }}
+                </option>
+              </select>
+              <p v-if="!canFetchRooms" class="text-xs text-neutral-500 mt-1">Select date and time first to see available rooms.</p>
+              <p v-else-if="roomLoading" class="text-xs text-neutral-500 mt-1">Loading rooms…</p>
+              <p v-else-if="availableRooms.length === 0" class="text-xs text-red-600 mt-1">No rooms available for this slot.</p>
             </div>
           </div>
           
@@ -142,6 +145,7 @@
             <Button 
               type="submit" 
               class="flex-1 bg-[#495846] hover:bg-[#38613a] text-white border-none"
+              :disabled="!selectedRoomId"
             >
               Confirm Schedule
             </Button>
@@ -175,6 +179,18 @@
             <div class="flex justify-between items-center">
               <span class="font-medium" style="color: #495846;">End Time:</span>
               <span class="font-semibold" style="color: #495846;">{{ formatTimeDisplay(form.endTime) }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Duration:</span>
+              <span class="font-semibold" style="color: #495846;">{{ form.durationHours }} hour{{ parseInt(form.durationHours) > 1 ? 's' : '' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Room:</span>
+              <span class="font-semibold" style="color: #495846;">{{ selectedRoomLabel }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="font-medium" style="color: #495846;">Price Estimate:</span>
+              <span class="font-semibold" style="color: #495846;">{{ estimatedPriceDisplay }}</span>
             </div>
           </div>
         </div>
@@ -302,10 +318,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import { router, usePage, Link } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
+import AppHeader from '@/components/AppHeader.vue';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getDurationOptions, computePrice, formatPHP } from '@/utils/promo';
+import axios from 'axios';
 import {
   Dialog,
   DialogContent,
@@ -330,7 +349,8 @@ const form = ref({
     hour: '',
     minute: '',
     period: 'AM'
-  }
+  },
+  durationHours: '1' // default 1 hour
 });
 
 // Modal state
@@ -338,15 +358,65 @@ const showConfirmationModal = ref(false);
 const showLogoutModal = ref(false);
 const showOneHourWarningModal = ref(false);
 const showPastTimeWarningModal = ref(false);
-const isValidating = ref(false);
-
-// Mobile menu state
-const menuOpen = ref(false);
 
 // Reactive time display properties that auto-update
 const currentTimeDisplay = ref('');
 const minimumTimeDisplay = ref('');
 let timeUpdateInterval: number | null = null;
+
+// Allowed durations (in hours). Sourced from promo rules per category
+const allowedDurations = ref<number[]>([1]);
+
+// Payment context (best-effort detection from Inertia props)
+const paymentType = computed(() => {
+  const p: any = page.props as any;
+  return p?.payment_type || p?.paymentType || p?.payment_method || p?.paymentMethod || '';
+});
+const isOnSitePayment = computed(() => {
+  const val = String(paymentType.value || '').toLowerCase();
+  return val.includes('on') && val.includes('site');
+});
+
+// Booking context from previous page (category and pax)
+const bookingCategory = computed(() => {
+  const p: any = page.props as any;
+  return p?.category || 'individual';
+});
+const bookingPax = computed<number>(() => {
+  const p: any = page.props as any;
+  const n = parseInt(String(p?.pax ?? ''), 10);
+  return isNaN(n) ? 1 : n;
+});
+const isConferenceCategory = computed(() => bookingCategory.value === 'master');
+const conferencePromoTier = computed(() => {
+  if (!isConferenceCategory.value) return '';
+  return bookingPax.value <= 6 ? '1–6' : '7–10';
+});
+
+// Recompute end time whenever start time or duration changes
+watch([
+  () => form.value.startTime.hour,
+  () => form.value.startTime.minute,
+  () => form.value.startTime.period,
+  () => form.value.durationHours
+], () => {
+  if (!form.value.startTime.hour || !form.value.startTime.minute) return;
+  const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
+  const startMinute = parseInt(form.value.startTime.minute);
+  // Determine duration from selection (conference rooms are per-hour; no forced lock)
+  const duration = parseInt(form.value.durationHours);
+  if (isNaN(duration) || duration <= 0) return;
+  const endTotalMinutes = startHour24 * 60 + startMinute + duration * 60;
+  const endHour24 = Math.floor(endTotalMinutes / 60) % 24;
+  const endMinute = endTotalMinutes % 60; // will match startMinute
+  const endPeriod = endHour24 >= 12 ? 'PM' : 'AM';
+  let endHour12 = endHour24 % 12; if (endHour12 === 0) endHour12 = 12;
+  form.value.endTime = {
+    hour: String(endHour12).padStart(2, '0'),
+    minute: String(endMinute).padStart(2, '0'),
+    period: endPeriod
+  };
+});
 
 // Function to update time displays
 function updateTimeDisplays() {
@@ -369,9 +439,10 @@ function updateTimeDisplays() {
     minute: '2-digit'
   });
   const [currentHour, currentMinute] = manilaTimeString24h.split(':').map(Number);
-  const minimumMinutes = (currentHour * 60 + currentMinute) + 60; // Add 1 hour
-  const minimumHour = Math.floor(minimumMinutes / 60) % 24;
-  const minimumMin = minimumMinutes % 60;
+  const minimumMinutesRaw = (currentHour * 60 + currentMinute) + 60; // Add 1 hour
+  const minimumSlotMinutes = roundUpToSlot(minimumMinutesRaw, 30); // align to 00/30 slots
+  const minimumHour = Math.floor(minimumSlotMinutes / 60) % 24;
+  const minimumMin = minimumSlotMinutes % 60;
   
   // Convert to 12-hour format
   let displayHour = minimumHour;
@@ -408,8 +479,12 @@ onMounted(() => {
     // Users must now manually select their preferred times
     
   } catch (e) {
+    void e;
     // Non-fatal: ignore and let user choose manually
   }
+
+  // Initialize allowed durations for the default start time minutes (00 or 30)
+  recomputeAllowedDurations();
 });
 
 // Cleanup interval when component unmounts
@@ -444,64 +519,50 @@ function convertTo24Hour(hour: string, period: string): number {
   return hour24;
 }
 
-// Validate time for today's bookings - requires 1 hour advance booking (no alerts, just returns boolean)
-function validateTimeForToday() {
-  if (!form.value.date || isValidating.value) return true;
-  
-  const selectedDate = new Date(form.value.date);
-  // Get current Manila date
-  const now = new Date();
-  const manilaDateString = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(now);
-  
-  const manilaToday = new Date(manilaDateString);
-  selectedDate.setHours(0, 0, 0, 0);
-  manilaToday.setHours(0, 0, 0, 0);
-  
-  // Only validate time if the selected date is today
-  if (selectedDate.getTime() === manilaToday.getTime()) {
-    // Get current Manila time
-    const manilaTimeString = now.toLocaleString("en-US", {
-      timeZone: "Asia/Manila",
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    const [currentHour, currentMinute] = manilaTimeString.split(':').map(Number);
-    
-    // Calculate minimum booking time (current time + 1 hour)
-    const currentTotalMinutes = currentHour * 60 + currentMinute;
-    const minimumBookingMinutes = currentTotalMinutes + 60; // Add 1 hour (60 minutes)
-    
-    // Validate start time
-    if (form.value.startTime.hour && form.value.startTime.minute && form.value.startTime.period) {
-      const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
-      const startMinute = parseInt(form.value.startTime.minute);
-      const startTotalMinutes = startHour24 * 60 + startMinute;
-      
-      if (startTotalMinutes < minimumBookingMinutes) {
-        return false;
-      }
-    }
-    
-    // Validate end time
-    if (form.value.endTime.hour && form.value.endTime.minute && form.value.endTime.period) {
-      const endHour24 = convertTo24Hour(form.value.endTime.hour, form.value.endTime.period);
-      const endMinute = parseInt(form.value.endTime.minute);
-      const endTotalMinutes = endHour24 * 60 + endMinute;
-      
-      if (endTotalMinutes < minimumBookingMinutes) {
-        return false;
-      }
-    }
-  }
-  return true;
+// Round arbitrary minutes to next slot boundary (slotSize minutes)
+function roundUpToSlot(totalMinutes: number, slotSize: number): number {
+  return Math.ceil(totalMinutes / slotSize) * slotSize;
 }
 
+// Recompute allowed durations based on start time, end-of-day constraint, and promo rules
+function recomputeAllowedDurations() {
+  if (!form.value.startTime.hour || !form.value.startTime.minute) {
+    // Use promo defaults without time constraint when time not yet selected
+    allowedDurations.value = getDurationOptions(bookingCategory.value, 8);
+    return;
+  }
+  const startHour24 = convertTo24Hour(form.value.startTime.hour, form.value.startTime.period);
+  const startMinute = parseInt(form.value.startTime.minute);
+  const startTotal = startHour24 * 60 + startMinute;
+  const lastEndSameMinute = 23 * 60 + startMinute; // latest end on same day keeping minute alignment
+  let maxHours = Math.floor((lastEndSameMinute - startTotal) / 60);
+  if (maxHours < 1) {
+    allowedDurations.value = [];
+    return;
+  }
+  const MAX_CAP = 8; // business cap; adjust as needed
+  maxHours = Math.min(maxHours, MAX_CAP);
+  // Pull promo-based options and then enforce time boundary
+  const fromPromo = getDurationOptions(bookingCategory.value, maxHours);
+  allowedDurations.value = fromPromo.filter(h => h <= maxHours);
+
+  // Ensure selected duration is still valid
+  const current = parseInt(form.value.durationHours || '1');
+  if (!allowedDurations.value.includes(current)) {
+    form.value.durationHours = String(allowedDurations.value[0] ?? '1');
+  }
+}
+
+// Watch start time fields to recompute allowed durations
+watch([
+  () => form.value.startTime.hour,
+  () => form.value.startTime.minute,
+  () => form.value.startTime.period
+], () => {
+  recomputeAllowedDurations();
+});
+
+// validateTimeForToday removed — validation handled inline in submitSchedule to avoid duplication.
 // Watch for date changes and prevent past date selection
 watch(() => form.value.date, (newDate) => {
   if (newDate) {
@@ -532,15 +593,27 @@ function formatTimeInput(event: Event, timeType: 'startTime' | 'endTime', field:
     else target.value = value.toString().padStart(2, '0');
     form.value[timeType].hour = target.value;
   } else if (field === 'minute') {
-    if (value < 0) target.value = '00';
-    else if (value > 59) target.value = '59';
-    else target.value = value.toString().padStart(2, '0');
+    // Per-hour timeslot rule: only 00 or 30 are valid minute values.
+    if (isNaN(value) || value < 0) {
+      target.value = '00';
+    } else if (value < 30) {
+      target.value = '00';
+    } else {
+      target.value = '30';
+    }
     form.value[timeType].minute = target.value;
+    // Keep endTime minute synced to startTime minute automatically
+    if (timeType === 'startTime') {
+      form.value.endTime.minute = target.value;
+    }
   }
 }
 
-// Format time for display
-function formatTimeDisplay(timeObj: { hour: string; minute: string; period: string }) {
+// Format time for display (defensive)
+function formatTimeDisplay(timeObj: { hour?: string; minute?: string; period?: string }) {
+  if (!timeObj?.hour || !timeObj?.minute || !timeObj?.period) {
+    return '';
+  }
   return `${timeObj.hour}:${timeObj.minute} ${timeObj.period}`;
 }
 
@@ -563,9 +636,28 @@ function submitSchedule() {
     alert('Please select end time');
     return;
   }
+
+  // Enforce per-hour slot rule: minutes must match and be either 00 or 30
+  const startMinVal = form.value.startTime.minute;
+  const endMinVal = form.value.endTime.minute;
+  if (startMinVal !== endMinVal) {
+    // Auto-fix by syncing end minutes to start minutes
+    form.value.endTime.minute = startMinVal;
+  }
+  if (!(startMinVal === '00' || startMinVal === '30')) {
+    // Snap invalid start minutes (should already be snapped by input) and reflect to end
+    form.value.startTime.minute = '00';
+    form.value.endTime.minute = '00';
+  }
+
+  // Ensure durationHours produces current endTime correctly (redundant but defensive)
+  const durationH = parseInt(form.value.durationHours);
+  if (isNaN(durationH) || durationH < 1) {
+    alert('Invalid duration selected.');
+    return;
+  }
   
-  // Check if selected date is in the past
-  const selectedDate = new Date(form.value.date);
+  // Check if selected date is in the past (handled via string compare with Manila date below)
   
   // Get current date and time in Asia/Manila timezone using Intl API
   const now = new Date();
@@ -618,7 +710,9 @@ function submitSchedule() {
     
     // Calculate minimum booking time (current time + 1 hour)
     const currentTotalMinutes = currentHour * 60 + currentMinute;
-    const minimumBookingMinutes = currentTotalMinutes + 60; // Add 1 hour (60 minutes)
+  // Compute earliest allowed start slot: +1 hour from now, then round to next 00/30 slot
+  const minimumBookingMinutesRaw = currentTotalMinutes + 60;
+  const minimumBookingMinutes = roundUpToSlot(minimumBookingMinutesRaw, 30);
     const startTotalMinutes = startHour24 * 60 + startMinute;
     const endTotalMinutes = endHour24 * 60 + endMinute;
     
@@ -642,9 +736,9 @@ function submitSchedule() {
     
     // Second check: Is the selected time at least 1 hour from now?
     // If not, auto-adjust to the earliest allowed time for better UX and inform via modal.
-    if (startTotalMinutes < minimumBookingMinutes || endTotalMinutes < minimumBookingMinutes) {
+  if (startTotalMinutes < minimumBookingMinutes || endTotalMinutes < minimumBookingMinutes) {
       console.log('ADJUSTING: Selected time is less than 1 hour from now; snapping to earliest allowed.');
-      let mins = minimumBookingMinutes;
+  let mins = minimumBookingMinutes;
       // Round up to nearest 5 minutes
       const round = 5;
       mins = Math.ceil(mins / round) * round;
@@ -653,7 +747,9 @@ function submitSchedule() {
       const sPeriod = sHour24 >= 12 ? 'PM' : 'AM';
       let sHour12 = sHour24 % 12; if (sHour12 === 0) sHour12 = 12;
 
-      const eMins = mins + 60; // one-hour duration default
+  // Duration logic: if on-site payment restrict to max 1 hour per day
+  const durationHours = isOnSitePayment.value ? 1 : parseInt(form.value.durationHours || '1');
+  const eMins = mins + durationHours * 60; // duration-based end
       const eHour24 = Math.floor(eMins / 60) % 24;
       const eMin = eMins % 60;
       const ePeriod = eHour24 >= 12 ? 'PM' : 'AM';
@@ -669,6 +765,9 @@ function submitSchedule() {
         minute: String(eMin).padStart(2, '0'),
         period: ePeriod,
       };
+
+      // Adjust durationHours field to reflect enforced duration
+      form.value.durationHours = String(isOnSitePayment.value ? 1 : durationHours);
 
       // Show informative warning modal using existing UI
       showOneHourWarningModal.value = true;
@@ -693,6 +792,41 @@ function submitSchedule() {
     alert('End time must be after start time.');
     return;
   }
+
+  // Per-hour duration enforcement: duration must be a whole number of hours (multiple of 60)
+  const duration = endTotalMinutes - startTotalMinutes;
+  if (duration < 60 || duration % 60 !== 0) {
+    // Auto-adjust to 1-hour slot (minimum) keeping minute component
+  const enforcedHours = isOnSitePayment.value ? 1 : 1; // minimum is still 1 hour either way
+  const adjustedEndTotal = startTotalMinutes + enforcedHours * 60;
+    const adjHour24 = Math.floor(adjustedEndTotal / 60) % 24;
+    const adjMinute = adjustedEndTotal % 60; // will match start minute
+    const adjPeriod = adjHour24 >= 12 ? 'PM' : 'AM';
+    let adjHour12 = adjHour24 % 12; if (adjHour12 === 0) adjHour12 = 12;
+    form.value.endTime = {
+      hour: String(adjHour12).padStart(2, '0'),
+      minute: String(adjMinute).padStart(2, '0'),
+      period: adjPeriod
+    };
+    form.value.durationHours = String(enforcedHours);
+    // Inform user via modal rather than alert (reuse one-hour warning modal)
+    showOneHourWarningModal.value = true;
+    return; // Let user confirm again after adjustment
+  }
+
+  // Final sanity check: end time should equal start time + durationHours * 60
+  const expectedEndTotal = startTotalMinutes + (isOnSitePayment.value ? 1 : durationH) * 60;
+  if (endTotalMinutes !== expectedEndTotal) {
+    const endHour24Fix = Math.floor(expectedEndTotal / 60) % 24;
+    const endMinuteFix = expectedEndTotal % 60;
+    const endPeriodFix = endHour24Fix >= 12 ? 'PM' : 'AM';
+    let endHour12Fix = endHour24Fix % 12; if (endHour12Fix === 0) endHour12Fix = 12;
+    form.value.endTime = {
+      hour: String(endHour12Fix).padStart(2, '0'),
+      minute: String(endMinuteFix).padStart(2, '0'),
+      period: endPeriodFix
+    };
+  }
   
   // Show confirmation modal instead of alert
   showConfirmationModal.value = true;
@@ -701,6 +835,10 @@ function submitSchedule() {
 function confirmBooking() {
   // Get booking data from props (passed from session)
   const bookingData = page.props as any;
+  if (!selectedRoomId.value) {
+    alert('Please select a room for your chosen time slot.');
+    return;
+  }
   
   // Prepare booking data
   const submitData = {
@@ -711,7 +849,7 @@ function confirmBooking() {
     additional_info: bookingData.additional || '',
     pax: bookingData.pax || 1,
     category: bookingData.category || 'individual',
-    room_id: bookingData.room_id || 1,
+    room_id: Number(selectedRoomId.value),
     booking_date: form.value.date,
     start_time: formatTimeDisplay(form.value.startTime),
     end_time: formatTimeDisplay(form.value.endTime),
@@ -738,6 +876,10 @@ function closeModal() {
 function viewMyBookings() {
   // Get booking data from props (passed from session)
   const bookingData = page.props as any;
+  if (!selectedRoomId.value) {
+    alert('Please select a room for your chosen time slot.');
+    return;
+  }
   
   // Prepare booking data
   const submitData = {
@@ -748,7 +890,7 @@ function viewMyBookings() {
     additional_info: bookingData.additional || '',
     pax: bookingData.pax || 1,
     category: bookingData.category || 'individual',
-    room_id: bookingData.room_id || 1,
+    room_id: Number(selectedRoomId.value),
     booking_date: form.value.date,
     start_time: formatTimeDisplay(form.value.startTime),
     end_time: formatTimeDisplay(form.value.endTime),
@@ -789,10 +931,6 @@ function goBack() {
   router.visit('/booking');
 }
 
-function goHome() {
-  router.visit('/');
-}
-
 function handleLogout() {
   showLogoutModal.value = true;
 }
@@ -804,6 +942,92 @@ function handleAuthAction() {
     router.visit('/login');
   }
 }
+
+// Pricing blurb displayed under Duration, based on current selection and promo
+const priceBlurb = computed(() => {
+  const dur = parseInt(form.value.durationHours || '0');
+  if (!dur) return '';
+  const cat = bookingCategory.value;
+  if (cat === 'master') {
+    const perHour = bookingPax.value <= 6 ? 200 : 300;
+    const est = computePrice(cat, dur, bookingPax.value);
+    return `Rate: ${formatPHP(perHour)} / hr • Estimated: ${formatPHP(est)}`;
+  }
+  const price = computePrice(cat, dur, bookingPax.value);
+  return price ? `Promo price: ${formatPHP(price)}` : '';
+});
+
+// Price estimate for the confirmation modal
+const estimatedPrice = computed(() => {
+  const dur = parseInt(form.value.durationHours || '0');
+  if (!dur) return null;
+  return computePrice(bookingCategory.value, dur, bookingPax.value);
+});
+const estimatedPriceDisplay = computed(() => {
+  const val = estimatedPrice.value;
+  return val == null ? '—' : formatPHP(val);
+});
+
+// -------- Room availability & selection --------
+type AvailRoom = { id: number; number: string; actual: string };
+const availableRooms = ref<AvailRoom[]>([]);
+const roomLoading = ref(false);
+const selectedRoomId = ref<number | null>(null);
+
+const canFetchRooms = computed(() => {
+  return Boolean(
+    form.value.date &&
+    form.value.startTime.hour && form.value.startTime.minute && form.value.startTime.period &&
+    form.value.endTime.hour && form.value.endTime.minute && form.value.endTime.period
+  );
+});
+
+const selectedRoomLabel = computed(() => {
+  const r = availableRooms.value.find(x => x.id === selectedRoomId.value);
+  return r ? r.number : '—';
+});
+
+async function fetchAvailableRooms() {
+  if (!canFetchRooms.value) {
+    availableRooms.value = [];
+    selectedRoomId.value = null;
+    return;
+  }
+  roomLoading.value = true;
+  try {
+    const resp = await axios.get('/rooms/available', {
+      params: {
+        category: bookingCategory.value,
+        date: form.value.date,
+        start_time: formatTimeDisplay(form.value.startTime),
+        end_time: formatTimeDisplay(form.value.endTime),
+      }
+    });
+    const rooms = Array.isArray(resp.data?.rooms) ? resp.data.rooms as AvailRoom[] : [];
+    availableRooms.value = rooms;
+    if (!rooms.find(r => r.id === selectedRoomId.value)) {
+      selectedRoomId.value = null;
+    }
+  } catch (e) {
+    console.error('Failed to load rooms', e);
+    availableRooms.value = [];
+    selectedRoomId.value = null;
+  } finally {
+    roomLoading.value = false;
+  }
+}
+
+// Refetch when date/time/duration changes
+watch([
+  () => form.value.date,
+  () => form.value.startTime.hour,
+  () => form.value.startTime.minute,
+  () => form.value.startTime.period,
+  () => form.value.durationHours,
+], () => {
+  // endTime already syncs from start + duration via existing watcher
+  fetchAvailableRooms();
+});
 </script>
 
 <style scoped>
@@ -813,9 +1037,9 @@ function handleAuthAction() {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   z-index: 100;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.03);
+  box-shadow: none;
 }
 .header-inner {
   display: flex;
@@ -825,7 +1049,7 @@ function handleAuthAction() {
   margin: 0 auto;
   padding: 0.5rem 2rem;
   min-height: 54px;
-  width: 100vw;
+  width: 100%;
 }
 .logo {
   font-weight: bold;
@@ -870,7 +1094,7 @@ function handleAuthAction() {
   position: absolute;
   top: 54px;
   left: 0;
-  width: 100vw;
+  width: 100%;
   background: #495846;
   display: flex;
   flex-direction: column;

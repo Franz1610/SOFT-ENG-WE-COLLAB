@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, usePage, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Building, MapPin, Users, Wifi, Monitor, Coffee, Car, User, Clock, DollarSign, RefreshCw } from 'lucide-vue-next';
-import { ref, computed } from 'vue';
+import { Building, Users, Wifi, Monitor, Coffee, Car, User, Clock, RefreshCw } from 'lucide-vue-next';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import axios from 'axios';
 
 // Type definitions
@@ -110,10 +110,20 @@ const totalStats = computed(() => {
 });
 
 // Fetch individual rooms for a category from the backend
+const previewDate = ref<string>('');
+const previewStart = ref<string>('');
+const previewEnd = ref<string>('');
+
 const fetchIndividualRooms = async (category: RoomCategory) => {
     loading.value = true;
     try {
-        const response = await axios.get(`/admin/rooms/${category.category}`);
+        const params: Record<string, string> = {};
+        if (previewDate.value && previewStart.value && previewEnd.value) {
+            params.date = previewDate.value;
+            params.start_time = previewStart.value;
+            params.end_time = previewEnd.value;
+        }
+        const response = await axios.get(`/admin/rooms/${category.category}`, { params });
         return response.data;
     } catch (error) {
         console.error('Error fetching room data:', error);
@@ -127,9 +137,12 @@ const fetchIndividualRooms = async (category: RoomCategory) => {
 const refreshRoomData = async () => {
     try {
         const response = await axios.get('/admin/rooms');
-        // If you need to refresh the entire page data, you can use Inertia's visit method
-        // For now, we'll just refresh the current modal if it's open
-        if (selectedCategory.value) {
+        // When modal is open, also update the selectedCategory stats from the latest payload
+        if (selectedCategory.value && Array.isArray(response.data)) {
+            const updated = response.data.find((c: any) => c.category === selectedCategory.value?.category);
+            if (updated) {
+                selectedCategory.value = updated;
+            }
             individualRooms.value = await fetchIndividualRooms(selectedCategory.value);
         }
     } catch (error) {
@@ -137,20 +150,42 @@ const refreshRoomData = async () => {
     }
 };
 
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'Available':
-            return 'bg-green-100 text-green-800 border-green-200';
-        case 'Occupied':
-            return 'bg-red-100 text-red-800 border-red-200';
-        case 'Reserved':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'Maintenance':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        default:
-            return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-};
+// ----- Auto-refresh while the Individual Rooms modal is open -----
+let minuteAlignTimeout: number | null = null;
+let autoRefreshInterval: number | null = null;
+
+function clearAutoRefreshTimers() {
+    if (minuteAlignTimeout) { clearTimeout(minuteAlignTimeout); minuteAlignTimeout = null; }
+    if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+}
+
+async function doTimedRefresh() {
+    // Refresh category stats and individual rooms
+    await refreshRoomData();
+}
+
+function startAutoRefresh() {
+    clearAutoRefreshTimers();
+    // Immediate refresh to catch up
+    void doTimedRefresh();
+    // Align the next refresh to the top of the next minute for precise status flips (e.g., 9:30)
+    const now = new Date();
+    const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    minuteAlignTimeout = setTimeout(() => {
+        void doTimedRefresh();
+        autoRefreshInterval = setInterval(() => void doTimedRefresh(), 60_000);
+    }, Math.max(0, msToNextMinute));
+}
+
+// Start/stop auto-refresh with modal visibility
+watch(showIndividualRooms, (open) => {
+    if (open) startAutoRefresh();
+    else clearAutoRefreshTimers();
+});
+
+onUnmounted(() => clearAutoRefreshTimers());
+
+// Removed unused getStatusColor helper
 
 const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -191,6 +226,8 @@ const viewRooms = async (category: RoomCategory) => {
     // Fetch real room data from backend
     individualRooms.value = await fetchIndividualRooms(category);
 };
+
+// Removed preview window apply helper as preview controls were removed
 
 const editRooms = async (category: RoomCategory) => {
     selectedCategory.value = category;
@@ -294,7 +331,7 @@ const confirmDeleteRoom = async () => {
     console.log('Attempting to delete room:', roomToDelete.value.number, 'in category:', selectedCategory.value?.category);
     
     try {
-        const response = await axios.delete(`/admin/rooms/delete`, {
+        await axios.delete(`/admin/rooms/delete`, {
             data: {
                 category: selectedCategory.value?.category,
                 room_number: roomToDelete.value.number
@@ -342,11 +379,17 @@ const confirmDeleteRoom = async () => {
 const occupyRoom = async (room: IndividualRoom) => {
     roomToOccupy.value = room;
     
-    // Reset form without pre-filled times
+    // Prefill with NOW and +1 hour to ensure walk-ins show as Occupied immediately
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const plusMinutes = (d: Date, m: number) => new Date(d.getTime() + m * 60000);
+    const start = now;
+    const end = plusMinutes(now, 60);
     occupyForm.value = {
         guestName: '',
-        startTime: '',
-        endTime: ''
+        startTime: hhmm(start),
+        endTime: hhmm(end)
     };
     
     showOccupyModal.value = true;
@@ -589,7 +632,7 @@ const confirmStopRoom = async () => {
 </script>
 
 <template>
-    <div style="background: #232323; min-height: 100vh;">
+    <div style="background: #FFFAE9; min-height: 100vh;">
         <Head title="Room Management" />
 
         <AppLayout :breadcrumbs="[
@@ -738,11 +781,13 @@ const confirmStopRoom = async () => {
         <Dialog v-model:open="showIndividualRooms">
             <DialogContent class="max-w-[98vw] w-[98vw] h-[95vh] max-h-[95vh] p-10 bg-[#FFFAE9] border-2 border-[#4b824b] sm:max-w-[98vw]">
                 <DialogHeader class="mb-6">
-                    <DialogTitle class="text-3xl text-[#4b824b] font-bold">{{ selectedCategory?.name }} Rooms</DialogTitle>
+                    <DialogTitle class="text-3xl text-[#4b824b] font-bold">{{ selectedCategory?.name }}</DialogTitle>
                     <DialogDescription class="text-lg text-[#344C34] mt-2">
                         {{ selectedCategory?.description }}
                     </DialogDescription>
                 </DialogHeader>
+        
+                <!-- Removed date/time preview controls per request -->
                 
                 <!-- Category Stats (Large) -->
                 <div class="grid grid-cols-3 gap-6 mb-8">
