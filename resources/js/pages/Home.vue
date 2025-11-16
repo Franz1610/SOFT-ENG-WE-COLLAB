@@ -48,7 +48,7 @@
           <div class="reviews-header">
             <div>
               <p class="reviews-eyebrow">Community pulse</p>
-              <h2>Reviews streaming in real time</h2>
+              <h2>Reviews</h2>
             </div>
             <div class="reviews-live-tools">
               <div class="live-pill" aria-live="polite">
