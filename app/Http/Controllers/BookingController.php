@@ -226,7 +226,10 @@ class BookingController extends Controller
                 $n = $id % 1000;
                 if ($n > 0) return 'Room ' . $n;
             }
-            // Legacy small numeric IDs (1,2,3) have no specific room; skip
+            // Legacy small numeric IDs (1,2,3) - convert to room labels
+            if ($id >= 1 && $id <= 3) {
+                return 'Room ' . $id;
+            }
             return null;
         }
 

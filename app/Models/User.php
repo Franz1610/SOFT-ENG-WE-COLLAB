@@ -192,6 +192,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get the bookings for the user.
+     */
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    /**
      * Send the password reset notification (queued).
      */
     public function sendPasswordResetNotification($token): void

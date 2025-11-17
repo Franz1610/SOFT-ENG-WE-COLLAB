@@ -120,9 +120,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 return [
                     'id' => $booking->id,
                     'user' => [
-                        'id' => $booking->user->id,
-                        'name' => $booking->additional_info === 'Walk-in booking created by admin' ? 'Walk In Guest' : $booking->user->name,
-                        'email' => $booking->additional_info === 'Walk-in booking created by admin' ? '' : $booking->user->email,
+                        'id' => $booking->user ? $booking->user->id : null,
+                        'name' => $booking->additional_info === 'Walk-in booking created by admin' ? 'Walk In Guest' : ($booking->user ? $booking->user->name : 'Unknown User'),
+                        'email' => $booking->additional_info === 'Walk-in booking created by admin' ? '' : ($booking->user ? $booking->user->email : ''),
                     ],
                     'company_name' => $booking->company_name,
                     'room' => $booking->room_id,

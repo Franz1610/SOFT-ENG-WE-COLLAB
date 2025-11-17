@@ -2,7 +2,7 @@
     <tr>
         <td style="padding-top: 16px;">
             <div style="color: #475569; font-size: 13px; line-height: 1.6;">
-                {{ Illuminate\Mail\Markdown::parse($slot) }}
+                {!! $slot !!}
             </div>
         </td>
     </tr>
