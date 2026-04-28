@@ -50,6 +50,28 @@ CollabSpace is a Laravel 12 application with Inertia.js and Vue 3 for room booki
 ## Setup
 
 1. Install PHP dependencies.
+`composer install`
+2. Install frontend dependencies.
+`npm install`
+3. Copy the environment file.
+`copy .env.example .env`
+4. Generate the application key.
+`php artisan key:generate`
+5. Configure your database and other environment values in `.env.`
 
-```bash
-composer install
+APP_NAME=CollabSpace
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=your_database
+DB_USERNAME=your_username
+DB_PASSWORD=your_password
+
+MAIL_MAILER=log
+
+6. Run the database migrations.
+`php artisan migrate`
+7. Start the development servers.
+`composer run dev`
